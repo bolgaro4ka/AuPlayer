@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { computed } from 'vue';
-import { fadeOutAndStop } from '@/functions/main';
+import { extractMetadata, fadeOutAndStop } from '@/functions/main';
 
 
 
@@ -15,9 +15,13 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
     const progress = ref(0);
     const isPlaying = ref(false);
     const duration = ref('--/--');
-    const name = ref('');
     const isSongPageFullScreen = ref(true);
     let activePlayId = 0;
+
+    const name = ref<string>('');
+    const author = ref<string>('');
+    const imageUrl = ref<string>('');
+    const title = ref<string>('')
 
   
     const loadFiles = async () => {
@@ -63,6 +67,8 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
     
       currentFile.value = file;
       name.value = file.name.replace('.mp3', '');
+
+      
     
       // если base64 нет — грузим
       if (!file.base64) {
@@ -82,6 +88,26 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
     
       const audio = new Audio(file.base64);
       currentAudio.value = audio;
+
+      try {
+
+        // Декодируем base64 в бинарный буфер
+        const base64Data = file.base64!.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+        const byteArray = new Uint8Array(byteNumbers);
+
+        // Создаём Blob и File
+        const blob = new Blob([byteArray], { type: 'audio/mp3' });
+        const fileForMetadata = new File([blob], file.name, { type: 'audio/mp3' });
+
+        const data = await extractMetadata(fileForMetadata);
+        title.value = data.title.replace('.mp3', '');
+        author.value = data.artist;
+        imageUrl.value = data.imageUrl;
+      } catch (error) {
+        console.error('Error extracting metadata:', error);
+      }
     
       audio.onended = async () => {
         isPlaying.value = false;
@@ -145,7 +171,7 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
     return {
       files, loadFiles, play, stop, togglePlay, currentFile, isPlaying,
       progress, duration, name, isSongPageFullScreen, updateProgress,
-      nextTrack, prevTrack, currentAudio
+      nextTrack, prevTrack, currentAudio, author, imageUrl, title
     };
   }
 )

@@ -36,6 +36,8 @@ const fadeOutAndStop = async (audio: HTMLAudioElement, duration = 500) => {
       const blob = new Blob([picture[0].data], { type: picture[0].format });
       imageUrl = URL.createObjectURL(blob);
     }
+
+    console.log('EXTRACTING METADATA:', title, artist, imageUrl);
   
     return {
       title: title || file.name.replace('.mp3', ''),
