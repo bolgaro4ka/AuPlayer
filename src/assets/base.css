@@ -5,4 +5,11 @@
   color: white;
   /* убираем синее выделение при нажатии */
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  /* отключаем возможность выделять текст */
+  user-select: none;
+
+}
+
+body {
+  background-color: #333;
 }

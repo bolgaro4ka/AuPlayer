@@ -73,6 +73,7 @@ function createVisualizer(audio: HTMLAudioElement, canvas: HTMLCanvasElement) {
     ctx.beginPath();
     ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, Math.PI * 2);
     ctx.fillStyle = `hsl(${Math.floor(average * 3)}, 80%, 60%)`;
+    musicPlayer.biteColor = `hsl(${Math.floor(average * 3)}, 80%, 60%)`;
     ctx.fill();
   }
 
@@ -402,7 +403,7 @@ watch(
     bottom: 0;
     left: 0;
     width: 100vw;
-    background: #000;
+    background: #121212;
     z-index: 10;
     height: 100px;
     display: flex;

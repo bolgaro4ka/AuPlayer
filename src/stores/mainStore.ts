@@ -3,7 +3,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { computed } from 'vue';
-import { extractMetadata, fadeOutAndStop } from '@/functions/main';
+import { extractMetadata, fadeOutAndStop, getCacheKey, loadMetadata } from '@/functions/main';
+import { Preferences } from '@capacitor/preferences';
 
 
 
@@ -23,7 +24,9 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
     const imageUrl = ref<string>('');
     const title = ref<string>('')
 
-  
+
+    const biteColor = ref<string>('');
+
     const loadFiles = async () => {
       try {
         const result = await Filesystem.readdir({
@@ -31,16 +34,82 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
           directory: Directory.Documents,
         });
     
-        files.value = result.files
-          .filter(f => f.name.endsWith('.mp3'))
-          .map(f => ({
-            name: f.name,
-            base64: '', // загружается позже
-          }));
+        const mp3Files = result.files.filter(f => f.name.endsWith('.mp3'));
+    
+        files.value = mp3Files.map(f => ({
+          name: f.name,
+          title: '',
+          author: '',
+          base64: '',
+          imageUrl: '',
+          isImageLoaded: false
+        }));
+    
+        // Метаданные загружаем фоном
+        for (const file of files.value) {
+          loadMetadata(file);
+        }
+    
       } catch (err) {
         console.error('Ошибка при чтении файлов:', err);
       }
     };
+    
+
+  
+    const loadMetadata = async (file: MusicFile) => {
+      if (file.title) return;
+    
+      const cacheKey = getCacheKey(file.name);
+    
+      try {
+        // 1. Попробовать достать из кэша
+        const { value } = await Preferences.get({ key: cacheKey });
+    
+        if (value) {
+          const cached = JSON.parse(value);
+          file.title = cached.title;
+          file.author = cached.author;
+          file.imageUrl = cached.imageUrl;
+          return;
+        }
+    
+        // 2. Если нет — загрузить как обычно
+        if (!file.base64) {
+          const content = await Filesystem.readFile({
+            path: file.name,
+            directory: Directory.Documents,
+          });
+          file.base64 = `data:audio/mp3;base64,${content.data}`;
+        }
+    
+        const blob = await fetch(file.base64).then(res => res.blob());
+        const fileObj = new File([blob], file.name, { type: 'audio/mp3' });
+    
+        const meta = await extractMetadata(fileObj);
+    
+        file.title = meta.title;
+        file.author = meta.artist;
+        file.imageUrl = meta.imageUrl;
+  
+    
+        // 3. Сохраняем в кэш
+        await Preferences.set({
+          key: cacheKey,
+          value: JSON.stringify({
+            title: meta.title,
+            author: meta.artist,
+            imageUrl: meta.imageUrl,
+          }),
+        });
+    
+      } catch (e) {
+        console.warn(`Ошибка при загрузке метаданных: ${file.name}`, e);
+      }
+    };
+    
+    
+    
 
     const currentIndex = computed(() =>
       files.value.findIndex(f => f.name === currentFile.value?.name)
@@ -169,9 +238,9 @@ export const  useMusicPlayer = defineStore('musicPlayer', () => {
     }
   
     return {
-      files, loadFiles, play, stop, togglePlay, currentFile, isPlaying,
+      files, loadMetadata, play, stop, togglePlay, currentFile, isPlaying,
       progress, duration, name, isSongPageFullScreen, updateProgress,
-      nextTrack, prevTrack, currentAudio, author, imageUrl, title
+      nextTrack, prevTrack, currentAudio, author, imageUrl, title, biteColor, loadFiles
     };
   }
 )
