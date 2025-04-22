@@ -34,10 +34,10 @@ const fadeOutAndStop = async (audio: HTMLAudioElement, duration = 500) => {
     const { title, artist, picture } = metadata.common;
   
     let imageUrl = '';
-    if (picture && picture.length > 0) {
-      const blob = new Blob([picture[0].data], { type: picture[0].format });
-      imageUrl = URL.createObjectURL(blob);
-    }
+    // if (picture && picture.length > 0 && false) { // Пока что отключу подгрузку картинок
+    //   const blob = new Blob([picture[0].data], { type: picture[0].format });
+    //   imageUrl = URL.createObjectURL(blob);
+    // }
 
     console.log('EXTRACTING METADATA:', title, artist, imageUrl);
   

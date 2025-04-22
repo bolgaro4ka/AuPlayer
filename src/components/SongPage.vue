@@ -400,7 +400,7 @@ watch(
 
 .sp__wrapper-mini {
     position: fixed;
-    bottom: 0;
+    bottom: 60px;
     left: 0;
     width: 100vw;
     background: #121212;
