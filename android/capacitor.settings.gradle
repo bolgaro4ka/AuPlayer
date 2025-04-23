@@ -11,6 +11,9 @@ project(':capacitor-preferences').projectDir = new File('../node_modules/@capaci
 include ':capawesome-capacitor-file-picker'
 project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modules/@capawesome/capacitor-file-picker/android')
 
+include ':capacitor-directory-picker'
+project(':capacitor-directory-picker').projectDir = new File('../capacitor-directory-picker/android')
+
 include ':capacitor-file-picker'
 project(':capacitor-file-picker').projectDir = new File('../node_modules/capacitor-file-picker/android')
 

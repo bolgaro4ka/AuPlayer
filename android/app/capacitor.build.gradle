@@ -12,6 +12,7 @@ dependencies {
     implementation project(':capacitor-filesystem')
     implementation project(':capacitor-preferences')
     implementation project(':capawesome-capacitor-file-picker')
+    implementation project(':capacitor-directory-picker')
     implementation project(':capacitor-file-picker')
     implementation project(':capacitor-music-controls-plugin')
 

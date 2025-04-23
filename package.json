@@ -17,6 +17,7 @@
     "@capacitor/filesystem": "^7.0.1",
     "@capacitor/preferences": "^7.0.1",
     "@capawesome/capacitor-file-picker": "^7.0.1",
+    "capacitor-directory-picker": "file:capacitor-directory-picker",
     "capacitor-file-picker": "^1.0.10",
     "capacitor-music-controls-plugin": "^6.1.0",
     "music-metadata": "^11.2.1",
