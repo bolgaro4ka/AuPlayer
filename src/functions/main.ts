@@ -30,6 +30,8 @@ const fadeOutAndStop = async (audio: HTMLAudioElement, duration = 500) => {
 
 
   async function extractMetadata(file: File) {
+
+
     const metadata = await parseBlob(file);
     const { title, artist, picture } = metadata.common;
   
@@ -40,6 +42,7 @@ const fadeOutAndStop = async (audio: HTMLAudioElement, duration = 500) => {
     // }
 
     console.log('EXTRACTING METADATA:', title, artist, imageUrl);
+
   
     return {
       title: title || file.name.replace('.mp3', ''),
@@ -52,8 +55,8 @@ const fadeOutAndStop = async (audio: HTMLAudioElement, duration = 500) => {
     try {
       if (!file.base64) {
         const content = await Filesystem.readFile({
-          path: file.name,
-          directory: Directory.Documents,
+          path: 'file://' + file.path,
+          directory: undefined,
         });
   
         file.base64 = `data:audio/mp3;base64,${content.data}`;

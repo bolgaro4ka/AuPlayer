@@ -175,4 +175,11 @@ button.confirm {
 button.confirm:hover {
   background: #45a049;
 }
+
+.file {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: default;
+}
+
 </style>

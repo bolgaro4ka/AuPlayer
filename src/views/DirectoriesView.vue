@@ -37,10 +37,18 @@ function openExplorer() {
   explorer.value.pickRootDirectory(); // <-- запускает выбор
 }
 
-function onDirectorySelected(uri: string) {
+async function onDirectorySelected(uri: string) {
   console.log('Выбрана директория с URI:', uri);
+  if (!directories.value.includes(uri)) {
+    directories.value.push(uri);
+    await Preferences.set({
+      key: 'directories',
+      value: JSON.stringify(directories.value),
+    });
+  }
   showExplorer.value = false;
 }
+
 
 </script>
 

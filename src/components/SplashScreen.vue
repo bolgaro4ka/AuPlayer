@@ -22,7 +22,7 @@
   onMounted(() => {
     setTimeout(() => {
       visible.value = false;
-    }, 3000);
+    }, 1000);
   });
   </script>
   

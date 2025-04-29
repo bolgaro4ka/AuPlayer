@@ -13,7 +13,6 @@
         :key="file.name"
         class="player__item"
         v-show="file.title.toLowerCase().includes(search.toLowerCase()) || file.name.toLowerCase().includes(search.toLowerCase()) || file.author.toLowerCase().includes(search.toLowerCase())"
-        v-intersect="() => loadMetadata(file)"
         @click="musicPlayer.play(file)"
       >
       <div class="player__img">
@@ -48,10 +47,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import SongPage from '@/components/SongPage.vue';
+import { onMounted, ref, watch } from 'vue';
 import { useMusicPlayer } from '@/stores/mainStore';
-import { loadMetadata } from '@/functions/main';
 
 const musicPlayer = useMusicPlayer();
 const search = ref<string>('');
@@ -60,8 +57,8 @@ watch(() => musicPlayer.isSongPageFullScreen, (value) => {
   document.body.style.overflow = value ? 'hidden' : '';
 });
 
-onMounted(() => {
-  musicPlayer.loadFiles();
+onMounted(async () => {
+  await musicPlayer.loadMusicFromDirectories();
 });
 </script>
 
@@ -112,6 +109,7 @@ onMounted(() => {
     background: #333;
     border-top: 1px solid #414141;
     padding: 0.5rem;
+ 
     cursor: pointer;
 
     display: flex;
@@ -135,7 +133,13 @@ onMounted(() => {
 
     .player__info {
       width: 100%;
-      height: 40px;
+      min-height: 40px;
+
+      h2, p {
+        overflow: hidden;
+        width: 90%;
+        word-break: break-word;
+      }
 
       h2 {
         color: white;
