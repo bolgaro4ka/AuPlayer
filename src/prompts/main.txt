@@ -1,0 +1,709 @@
+приложение на основе библиотеки Capacitor на vue с использованием ts (android)
+
+это музыкальный плеер
+
+
+router/index.ts
+import { createRouter, createWebHistory } from 'vue-router'
+import HomeView from '../views/SongsView.vue'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: HomeView,
+    },
+    {
+      path: '/playlists/',
+      name: 'playlists',
+      component: () => import('../views/PlaylistsView.vue'),
+    },
+    {
+      path: '/repositories/',
+      name: 'repositories',
+      component: () => import('../views/DirectoriesView.vue'),
+    },
+    {
+      path: '/playlist/:id',
+      name: 'playlist',
+      component: () => import('../views/PlaylistView.vue'),
+    }
+    
+  ],
+})
+
+export default router
+
+stores/mainStore.ts
+// stores/mainStore.ts
+import type { MusicFile } from '@/composables/useMusicPlayer'
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { Filesystem } from '@capacitor/filesystem'
+import { Preferences } from '@capacitor/preferences'
+import { extractMetadata, fadeOutAndStop } from '@/functions/main'
+
+export const useMusicPlayer = defineStore('musicPlayer', () => {
+  const files = ref<MusicFile[]>([])
+  const currentAudio = ref<HTMLAudioElement | null>(null)
+  const currentFile = ref<MusicFile | null>(null)
+  const progress = ref(0)
+  const isPlaying = ref(false)
+  const duration = ref('--/--')
+  const isSongPageFullScreen = ref(true)
+  let activePlayId = 0
+
+  const name = ref<string>('')
+  const author = ref<string>('')
+  const imageUrl = ref<string>('')
+  const title = ref<string>('')
+
+  const biteColor = ref<string>('')
+
+  const playlists = ref<{ id: string; name: string; image?: string; trackPaths: string[] }[]>([])
+  const currentPlaylist = ref<{ id: string; trackPaths: string[] } | null>(null)
+
+  const addPlaylist = (name: string, image: string | undefined, trackPaths: string[]) => {
+    playlists.value.push({
+      id: Date.now().toString(),
+      name,
+      image,
+      trackPaths,
+    })
+  }
+
+  const getTracksFromPlaylist = (playlistId: string) => {
+    const playlist = playlists.value.find(p => p.id === playlistId)
+    return playlist?.trackPaths.map(path => files.value.find(f => f.path === path)).filter(Boolean) as MusicFile[]
+  }
+
+
+  const loadMusicFromDirectories = async () => {
+    try {
+      console.log('Start loadMusicFromDirectories()')
+      const { value } = await Preferences.get({ key: 'directories' })
+      if (!value) return
+
+      const dirs: string[] = JSON.parse(value)
+      const allFiles: MusicFile[] = []
+
+      for (const dir of dirs) {
+        try {
+          const result = await Filesystem.readdir({
+            path: dir,
+            directory: undefined,
+          })
+
+          const mp3Files = result.files
+            .filter(f => f.name.endsWith('.mp3'))
+            .map(f => ({
+              name: f.name,
+              title: '',
+              author: '',
+              base64: '',
+              imageUrl: '',
+              isImageLoaded: false,
+              path: `${dir}/${f.name}`
+            }))
+
+          allFiles.push(...mp3Files)
+        } catch (e) {
+          console.log('Ошибка при чтении директории', dir, e)
+        }
+      }
+
+      console.log('DELETING DUBS')
+
+      // Убираем дубликаты
+      const uniqueFilesMap = new Map<string, MusicFile>()
+      allFiles.forEach(file => {
+        const key = file.path ?? file.name
+        if (!uniqueFilesMap.has(key)) {
+          uniqueFilesMap.set(key, file)
+        }
+      })
+
+      files.value = Array.from(uniqueFilesMap.values())
+
+      // Загружаем только метаданные в фоне
+      console.log('LOAD METADATA')
+      for (const file of files.value) {
+        await loadMetadataWithCache(file)
+      }
+
+      console.log('END loadMusicFromDirectories()')
+      console.log('FILES:', files.value)
+    } catch (e) {
+      console.error('Ошибка при загрузке директорий:', e)
+    }
+  }
+
+  const loadMetadataWithCache = async (file: MusicFile) => {
+    const cacheKey = `meta:${file.name}`;
+    try {
+      const cache = await Preferences.get({ key: cacheKey });
+      if (cache.value) {
+        const meta = JSON.parse(cache.value);
+        file.title = meta.title;
+        file.author = meta.author;
+        file.imageUrl = meta.imageUrl;
+        file.isImageLoaded = !!meta.imageUrl;
+        return;
+      }
+  
+      // Загружаем base64 только если нужно
+      const content = await Filesystem.readFile({
+        path: 'file://' + file.path,
+        directory: undefined,
+      });
+  
+      file.base64 = `data:audio/mp3;base64,${content.data}`;
+      const blob = await fetch(file.base64).then(res => res.blob());
+      const fileObj = new File([blob], file.name, { type: 'audio/mp3' });
+  
+      const meta = await extractMetadata(fileObj);
+      file.title = meta.title;
+      file.author = meta.artist;
+      file.imageUrl = meta.imageUrl;
+      file.isImageLoaded = !!meta.imageUrl;
+  
+      // Сохраняем в Preferences
+      await Preferences.set({
+        key: cacheKey,
+        value: JSON.stringify({
+          title: file.title,
+          author: file.author,
+          imageUrl: file.imageUrl,
+        }),
+      });
+  
+      // Удаляем base64 чтобы не держать в памяти
+      file.base64 = '';
+    } catch (e) {
+      console.warn('Ошибка метаданных:', file.name, e);
+      file.title = file.name.replace('.mp3', '');
+      file.author = 'Неизвестный автор';
+      file.imageUrl = '';
+    }
+  };
+  
+
+  // Только метаданные
+  // const loadFileMetadata = async (file: MusicFile) => {
+  //   try {
+  //     file.title = file.name.replace('.mp3', '')
+  //     file.author = 'Неизвестный автор'
+  //     file.imageUrl = ''
+  //   } catch (e) {
+  //     console.warn(`Ошибка при загрузке метаданных: ${file.name}`, e)
+  //   }
+  // }
+  
+
+  const getCurrentPlaylistFiles = computed(() => {
+    if (!currentPlaylist.value) return files.value
+    return currentPlaylist.value.trackPaths.map(p => files.value.find(f => f.path === p)).filter(Boolean) as MusicFile[]
+  })
+  
+  const currentIndex = computed(() =>
+    getCurrentPlaylistFiles.value.findIndex(f => f.name === currentFile.value?.name)
+  )
+  
+  const nextTrack = async () => {
+    const playlistFiles = getCurrentPlaylistFiles.value
+    if (playlistFiles.length === 0) return
+    const next = (currentIndex.value + 1) % playlistFiles.length
+    await play(playlistFiles[next])
+  }
+  
+
+  const prevTrack = async () => {
+    if (files.value.length === 0) return
+    const prev = (currentIndex.value - 1 + files.value.length) % files.value.length
+    await play(files.value[prev])
+  }
+
+  const play = async (file: MusicFile) => {
+    activePlayId++
+    const thisPlayId = activePlayId
+
+
+
+    await stop()
+
+
+    name.value = file.title || file.name.replace('.mp3', '')
+    author.value = file.author || 'Неизвестный автор'
+    imageUrl.value = file.imageUrl || ''
+    title.value = file.title || ''
+
+    // Только теперь читаем песню
+    if (!file.base64) {
+      const content = await Filesystem.readFile({
+        path: 'file://' + file.path,
+        directory: undefined,
+      })
+      if (thisPlayId !== activePlayId) return
+      file.base64 = `data:audio/mp3;base64,${content.data}`
+    }
+
+    currentFile.value = file
+
+
+    if (thisPlayId !== activePlayId) return
+
+    const audio = new Audio(file.base64)
+    currentAudio.value = audio
+
+    audio.onended = async () => {
+      isPlaying.value = false
+      progress.value = 0
+      await fadeOutAndStop(audio)
+      nextTrack()
+    }
+
+    audio.ontimeupdate = () => {
+      if (audio.duration && isPlaying.value) {
+        progress.value = (audio.currentTime / audio.duration) * 100
+        duration.value = `${String(Math.floor(audio.currentTime / 60)).padStart(2, '0')}:${String(Math.floor(audio.currentTime % 60)).padStart(2, '0')}/${String(Math.floor(audio.duration / 60)).padStart(2, '0')}:${String(Math.floor(audio.duration % 60)).padStart(2, '0')}`
+      }
+    }
+
+    await audio.play()
+    isPlaying.value = true
+  }
+
+  const stop = () => {
+    return new Promise<void>(async (resolve) => {
+      if (currentAudio.value) {
+        await fadeOutAndStop(currentAudio.value)
+        currentAudio.value.pause()
+        currentAudio.value.currentTime = 0
+        currentAudio.value.src = ''
+        currentAudio.value.load()
+        currentAudio.value = null
+      }
+      isPlaying.value = false
+      progress.value = 0
+      duration.value = '--/--'
+      resolve()
+    })
+  }
+
+  const togglePlay = () => {
+    if (currentAudio.value) {
+      if (isPlaying.value) {
+        currentAudio.value.pause()
+        isPlaying.value = false
+      } else {
+        currentAudio.value.play()
+        isPlaying.value = true
+      }
+    }
+  }
+
+  const updateProgress = (event: any) => {
+    isPlaying.value = false
+    if (currentAudio.value) {
+      const curPercent = event.target.value
+      currentAudio.value.currentTime = curPercent * currentAudio.value.duration / 100
+    }
+    isPlaying.value = true
+  }
+
+  return {
+    files,
+    loadMusicFromDirectories,
+    play,
+    stop,
+    togglePlay,
+    currentFile,
+    isPlaying,
+    progress,
+    duration,
+    name,
+    isSongPageFullScreen,
+    updateProgress,
+    nextTrack,
+    prevTrack,
+    currentAudio,
+    author,
+    imageUrl,
+    title,
+    biteColor,
+    playlists,
+    addPlaylist,
+    getTracksFromPlaylist,
+    currentPlaylist
+
+  }
+})
+
+PlaylistsView.vue
+
+
+
+
+<script setup lang="ts">
+import Modal from '@/components/Modal.vue'
+import { useMusicPlayer } from '@/stores/mainStore'
+import { ref } from 'vue'
+
+const { files, addPlaylist, playlists } = useMusicPlayer()
+const newPlaylistName = ref('')
+const selectedPaths = ref<string[]>([])
+const playlistImage = ref<string | undefined>()
+const isShowPlaylistCreator = ref(false);
+
+const onImageChange = (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      playlistImage.value = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+const createPlaylist = () => {
+  addPlaylist(newPlaylistName.value, playlistImage.value, selectedPaths.value)
+  isShowPlaylistCreator.value = false
+  newPlaylistName.value = ''
+  selectedPaths.value = []
+  playlistImage.value = undefined
+}
+
+</script>
+
+
+<template>
+  <div>
+  <!-- Тут список плэйлистов с возможностью создания -->
+  <div v-for="playlist in playlists" :key="playlist.id">
+    <router-link :to="`/playlist/${playlist.id}`">{{ playlist.name }}</router-link>
+  </div>
+  <button @click="isShowPlaylistCreator = !isShowPlaylistCreator">Create</button>
+   <Teleport to="body">
+    <Suspense>
+      <Modal v-if="isShowPlaylistCreator" @close="isShowPlaylistCreator = false">
+        <div>
+          <input v-model="newPlaylistName" placeholder="Название" />
+          <input type="file" @change="onImageChange" accept="image/*" />
+          <div v-for="track in files" :key="track.path">
+            <label><input type="checkbox" v-model="selectedPaths" :value="track.path" /> {{ track.title }}</label>
+          </div>
+          <button @click="createPlaylist">Создать</button>
+        </div>
+      </Modal>
+      
+    </Suspense>
+   </Teleport>
+  </div>
+</template>
+
+<style>
+@media (min-width: 1024px) {
+  .about {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+  }
+}
+</style>
+
+PlaylistView.vue
+<script setup lang="ts">
+import { useRoute } from 'vue-router'
+import { useMusicPlayer } from '@/stores/mainStore'
+
+const { getTracksFromPlaylist, currentPlaylist, play } = useMusicPlayer()
+const route = useRoute()
+const tracks = getTracksFromPlaylist(route.params.id as string)
+
+console.log(tracks, route.params.id)
+
+if (currentPlaylist) {
+  currentPlaylist.id = route.params.id as string
+  currentPlaylist.trackPaths = tracks.map(t => t.path).filter((path): path is string => path !== undefined)
+}
+</script>
+
+<template>
+  <div v-if="tracks.length">
+    <h1>Плейлист</h1>
+    <div v-for="track in tracks" :key="track.path">
+      <div @click="play(track)">
+        {{ track.title }} — {{ track.author }}
+      </div>
+    </div>
+  </div>
+  <div v-else>
+    <h1>Плейлист пуст</h1>
+  </div>
+</template>
+
+
+SongsView.vue
+<template>
+  <div class="player" :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : {}">
+    <div class="player__search">
+      <h2 :style="{color: musicPlayer.biteColor}">AuPlayer</h2>
+      <input type="text" v-model="search" placeholder="Найти">
+      <div class="player__search-clear" @click="search=''" v-if="search">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+      </div>
+    </div>
+    <ul class="player__list" :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : { marginBottom: '100px'}">
+      <li
+        v-for="file in musicPlayer.files"
+        :key="file.name"
+        class="player__item"
+        v-show="file.title.toLowerCase().includes(search.toLowerCase()) || file.name.toLowerCase().includes(search.toLowerCase()) || file.author.toLowerCase().includes(search.toLowerCase())"
+        @click="musicPlayer.play(file)"
+      >
+      <div class="player__img">
+        <!-- SVG показывается, пока картинка не загрузилась -->
+        <svg
+          v-show="!file.isImageLoaded"
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 -960 960 960"
+          width="24px"
+          fill="#e8eaed"
+        ><path d="M400-120q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T480-418v-422h240v160H560v400q0 66-47 113t-113 47Z"/></svg>
+      
+        <!-- Картинка: по событию load ставим imageLoaded = true -->
+        <!-- <img
+          v-if="file.imageUrl"
+          v-show="file.isImageLoaded"
+          :src="file.imageUrl"
+          @load="file.isImageLoaded = true"
+          style="display: block;"
+        /> -->
+      </div>
+        <div class="player__line"></div>
+        <div class="player__info">
+          <h2>{{ file.title }}</h2>
+          <p>{{file.author}}</p>
+        </div>
+      </li>
+    </ul>
+    
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref, watch } from 'vue';
+import { useMusicPlayer } from '@/stores/mainStore';
+
+const musicPlayer = useMusicPlayer();
+const search = ref<string>('');
+
+watch(() => musicPlayer.isSongPageFullScreen, (value) => {
+  document.body.style.overflow = value ? 'hidden' : '';
+});
+
+onMounted(async () => {
+  await musicPlayer.loadMusicFromDirectories();
+});
+</script>
+
+<style lang="scss" scoped>
+.player {
+
+
+
+  width: 100%;
+
+  &__search {
+    height: 50px;
+    width: 100vw;
+    display: flex;
+    align-items: center;
+    padding-left: 5px;
+    padding-right: 5px;
+    gap: 10px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #333;
+
+    h2 {
+      font-size: 30px;
+
+    }
+
+    input {
+      width: 100%;
+      height: 100%;
+      background: #333;
+      border: none;
+      color: white;
+      font-size: 24px;
+      font-weight: 900;
+      padding: 0 1rem;
+      outline: none;
+    }
+  }
+  &__list {
+    margin-top: 50px;
+    list-style: none;
+    width: 100%;
+    padding: 0;
+  }
+  &__item {
+    background: #333;
+    border-top: 1px solid #414141;
+    padding: 0.5rem;
+ 
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+
+    &:hover {
+      background: #000;
+    }
+
+    
+    
+
+    img {
+      width: 30px;
+    }
+
+    svg {
+      width: 30px;
+    }
+
+
+    .player__info {
+      width: 100%;
+      min-height: 40px;
+
+      h2, p {
+        overflow: hidden;
+        width: 90%;
+        word-break: break-word;
+      }
+
+      h2 {
+        color: white;
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      p {
+        color: #aaa;
+        font-size: 12px;
+      }
+    }
+  }
+
+  .player__line {
+    width: 2px;
+    height: 40px;
+    background-color: #414141;
+    margin-left: 5px;
+    margin-right: 5px;
+  }
+}
+</style>
+
+functions/main.ts
+import type { MusicFile } from '@/composables/useMusicPlayer';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { parseBlob } from 'music-metadata';
+
+const fadeOutAndStop = async (audio: HTMLAudioElement, duration = 500) => {
+    return new Promise<void>((resolve) => {
+      const steps = 20;
+      const interval = duration / steps;
+      let currentStep = 0;
+  
+      const originalVolume = audio.volume;
+  
+      const fade = setInterval(() => {
+        currentStep++;
+        const volume = originalVolume * (1 - currentStep / steps);
+        audio.volume = Math.max(volume, 0);
+  
+        if (currentStep >= steps) {
+          clearInterval(fade);
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = originalVolume; // вернуть громкость на будущее
+          resolve();
+        }
+      }, interval);
+    });
+  };
+
+
+
+
+  async function extractMetadata(file: File) {
+
+
+    const metadata = await parseBlob(file);
+    const { title, artist, picture } = metadata.common;
+  
+    let imageUrl = '';
+    // if (picture && picture.length > 0 && false) { // Пока что отключу подгрузку картинок
+    //   const blob = new Blob([picture[0].data], { type: picture[0].format });
+    //   imageUrl = URL.createObjectURL(blob);
+    // }
+
+    console.log('EXTRACTING METADATA:', title, artist, imageUrl);
+
+  
+    return {
+      title: title || file.name.replace('.mp3', ''),
+      artist: artist || 'Unknown Artist',
+      imageUrl,
+    };
+  }
+
+  const loadMetadata = async (file: MusicFile) => {
+    try {
+      if (!file.base64) {
+        const content = await Filesystem.readFile({
+          path: 'file://' + file.path,
+          directory: undefined,
+        });
+  
+        file.base64 = `data:audio/mp3;base64,${content.data}`;
+      }
+  
+      const blob = await fetch(file.base64).then(res => res.blob());
+      const fileObj = new File([blob], file.name, { type: 'audio/mp3' });
+  
+      const meta = await extractMetadata(fileObj);
+  
+      file.title = meta.title;
+      file.author = meta.artist;
+      file.imageUrl = meta.imageUrl;
+  
+    } catch (e) {
+      console.warn(`Ошибка при загрузке метаданных: ${file.name}`, e);
+    }
+  };
+
+  function getCacheKey(fileName: string) {
+    return `meta:${fileName}`;
+  }
+  
+  
+  
+  
+  export {fadeOutAndStop, extractMetadata, loadMetadata, getCacheKey}
+
+Допиши логику плейлистов ведь сейчас:
+1. плейлисты не сохраняются в памяти
+2. картинка плейлистов нигде не используется
+3. кнопки вперёд и назад идут не по плейлисту, а по общему списку
+4. при выборе песен в плейлист долэен быть поиск
+5. на странице самого листа нужно чтобы песню можно было удалить или долбавить в плейлист

@@ -33,6 +33,19 @@ export const useMusicPlayer = defineStore('musicPlayer', () => {
       image,
       trackPaths,
     })
+    savePlaylists()
+  }
+
+  const loadPlaylists = async () => {
+    const { value } = await Preferences.get({ key: 'playlists' })
+    if (value) playlists.value = JSON.parse(value)
+  }
+  
+  const savePlaylists = async () => {
+    await Preferences.set({
+      key: 'playlists',
+      value: JSON.stringify(playlists.value)
+    })
   }
 
   const getTracksFromPlaylist = (playlistId: string) => {
@@ -174,26 +187,52 @@ export const useMusicPlayer = defineStore('musicPlayer', () => {
   
   const nextTrack = async () => {
     const playlistFiles = getCurrentPlaylistFiles.value
-    if (playlistFiles.length === 0) return
-    const next = (currentIndex.value + 1) % playlistFiles.length
-    await play(playlistFiles[next])
+    if (!playlistFiles.length) return
+    
+    const currentIdx = currentIndex.value
+    const nextIdx = (currentIdx + 1) % playlistFiles.length
+    await play(playlistFiles[nextIdx])
   }
   
-
   const prevTrack = async () => {
-    if (files.value.length === 0) return
-    const prev = (currentIndex.value - 1 + files.value.length) % files.value.length
-    await play(files.value[prev])
+    const playlistFiles = getCurrentPlaylistFiles.value
+    if (!playlistFiles.length) return
+    
+    const currentIdx = currentIndex.value
+    const prevIdx = (currentIdx - 1 + playlistFiles.length) % playlistFiles.length
+    await play(playlistFiles[prevIdx])
+  }
+
+  // stores/mainStore.ts
+  const removeTrackFromPlaylist = (playlistId: string, trackPath: string) => {
+    const playlist = playlists.value.find(p => p.id === playlistId)
+    if (playlist) {
+      playlist.trackPaths = playlist.trackPaths.filter(p => p !== trackPath)
+      savePlaylists()
+    }
+  }
+
+  const addTrackToPlaylist = (playlistId: string, trackPath: string) => {
+    const playlist = playlists.value.find(p => p.id === playlistId)
+    if (playlist && !playlist.trackPaths.includes(trackPath)) {
+      playlist.trackPaths.push(trackPath)
+      savePlaylists()
+    }
   }
 
   const play = async (file: MusicFile) => {
+
+    if (currentPlaylist.value) {
+      const playlistIndex = playlists.value.findIndex(p => p.id === currentPlaylist.value?.id)
+      if (playlistIndex > -1) {
+        currentPlaylist.value = playlists.value[playlistIndex]
+      }
+    }
+
     activePlayId++
     const thisPlayId = activePlayId
 
-
-
     await stop()
-
 
     name.value = file.title || file.name.replace('.mp3', '')
     author.value = file.author || 'Неизвестный автор'
@@ -274,6 +313,8 @@ export const useMusicPlayer = defineStore('musicPlayer', () => {
     isPlaying.value = true
   }
 
+  loadPlaylists()
+
   return {
     files,
     loadMusicFromDirectories,
@@ -297,7 +338,11 @@ export const useMusicPlayer = defineStore('musicPlayer', () => {
     playlists,
     addPlaylist,
     getTracksFromPlaylist,
-    currentPlaylist
+    currentPlaylist,
+    loadPlaylists,
+    savePlaylists,
+    removeTrackFromPlaylist,
+    addTrackToPlaylist
 
   }
 })
