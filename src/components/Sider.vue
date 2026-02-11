@@ -28,6 +28,7 @@ import SiderButton from './particles/Sider/SiderButton.vue';
 
     height: 60px;
     width: 100%;
+    margin-bottom: env(safe-area-inset-bottom);
 
     .sider {
         display: flex;

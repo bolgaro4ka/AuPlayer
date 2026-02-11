@@ -6,5 +6,5 @@ export interface MusicFile {
   base64: string;
   imageUrl: string;
   isImageLoaded: boolean;
-  path?: string; // <-- добавлено
+  path: string; // <-- добавлено
 }

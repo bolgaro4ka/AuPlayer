@@ -1,39 +1,48 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import Sider from './components/Sider.vue';
 import SongPage from './components/SongPage.vue';
 import SplashScreen from './components/SplashScreen.vue';
+import { StatusBar } from '@capacitor/status-bar';
+
+onMounted(async () => {
+    await StatusBar.setOverlaysWebView({ overlay: false })
+})
 
 </script>
 
 <template>
 
-  <SplashScreen/>
-  
-  <SongPage/>
+    <SplashScreen />
 
-  <div class="main">
-    <div class="view">
-      <router-view v-slot="{ Component }">
-        <keep-alive include="SongsView">
-          <component :is="Component" />
-        </keep-alive>
-      </router-view>
+    <SongPage />
+
+    <div class="main">
+        <div class="view">
+            <router-view v-slot="{ Component }">
+                <keep-alive include="SongsView">
+                    <component :is="Component" />
+                </keep-alive>
+            </router-view>
+        </div>
+        <Sider />
     </div>
-    <Sider/>
-  </div>
 </template>
 
 <style lang="scss" scoped>
-
 .main {
-  display: flex;
-  flex-direction: column;
-  max-height: 100dvh;
-  overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 100dvh;
+    overflow: hidden;
+    
+    
 
-  .view {
-    overflow: scroll;
-    min-height: calc(100dvh - 60px);
-  }
+    .view {
+        overflow: scroll;
+        min-height: calc(100dvh - 60px - env(safe-area-inset-bottom));
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
 }
 </style>
