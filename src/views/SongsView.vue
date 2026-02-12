@@ -1,18 +1,7 @@
 <template>
-    <div class="player" :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : {}">
-        <div class="player__search">
-            <h2 :style="{ color: musicPlayer.biteColor }">AuPlayer</h2>
-            <input type="text" v-model="search" placeholder="Найти">
-            <div class="player__search-clear" @click="search = ''" v-if="search">
-                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
-                    fill="#e8eaed">
-                    <path
-                        d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
-                </svg>
-            </div>
-        </div>
-        <ul class="player__list"
-            :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : { marginBottom: '100px' }">
+    <div>
+        <Header @changeSearch="(val) => search = val"/>
+        <ul class="player__list" :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : { marginBottom: '100px' }">
             <li v-for="file in musicPlayer.files" :key="file.name" class="player__item"
                 v-show="file.title.toLowerCase().includes(search.toLowerCase()) || file.name.toLowerCase().includes(search.toLowerCase()) || file.author.toLowerCase().includes(search.toLowerCase())"
                 @click="musicPlayer.play(file)">
@@ -25,13 +14,14 @@
                     </svg>
 
                     <!-- Картинка: по событию load ставим imageLoaded = true -->
-                    <!-- <img
-          v-if="file.imageUrl"
-          v-show="file.isImageLoaded"
-          :src="file.imageUrl"
-          @load="file.isImageLoaded = true"
-          style="display: block;"
-        /> -->
+                    <img
+                        v-if="file.imageUrl && settingsStore.preferImage"
+                        v-show="file.isImageLoaded"
+                        :src="file.imageUrl"
+                        @load="file.isImageLoaded = true"
+                        style="display: block;"
+                        alt="song"
+                    />
                 </div>
                 <div class="player__line"></div>
                 <div class="player__info">
@@ -47,8 +37,11 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useMusicPlayer } from '@/stores/mainStore';
+import Header from '@/components/Header.vue';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 const musicPlayer = useMusicPlayer();
+const settingsStore = useSettingsStore();
 const search = ref<string>('');
 
 watch(() => musicPlayer.isSongPageFullScreen, (value) => {
@@ -56,8 +49,7 @@ watch(() => musicPlayer.isSongPageFullScreen, (value) => {
 });
 
 onMounted(async () => {
-    let a = await musicPlayer.loadMusicFromDirectories();
-    console.log('musicPlayer.files', a)
+    await musicPlayer.loadMusicFromDirectories();
 });
 </script>
 
@@ -68,36 +60,7 @@ onMounted(async () => {
 
     width: 100%;
 
-    &__search {
-        height: 50px;
-        width: 100vw;
-        display: flex;
-        align-items: center;
-        padding-left: 5px;
-        padding-right: 5px;
-        gap: 10px;
-        position: fixed;
-        top: env(safe-area-inset-top);
-        left: 0;
-        background-color: #333;
-
-        h2 {
-            font-size: 30px;
-
-        }
-
-        input {
-            width: 100%;
-            height: 100%;
-            background: #333;
-            border: none;
-            color: white;
-            font-size: 24px;
-            font-weight: 900;
-            padding: 0 1rem;
-            outline: none;
-        }
-    }
+    
 
     &__list {
         margin-top: 50px;

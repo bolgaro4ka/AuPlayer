@@ -284,7 +284,7 @@ watch(
     height: 100dvh;
     z-index: 10;
 
-    background: #121212;
+    background: var(--full-song-page-background-color);
     color: #fff;
 
     .sp__content {

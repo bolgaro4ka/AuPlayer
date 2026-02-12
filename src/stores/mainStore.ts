@@ -95,9 +95,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                             isImageLoaded: false,
                             path: `${dir}/${f.name}`,
                         }));
-                        console.log(`mainStore.ts:loadMusicFromDirectories:result - ${result}`)
-                        console.log(`mainStore.ts:loadMusicFromDirectories:result:files - ${result.files}`)
-                        console.log(`mainStore.ts:loadMusicFromDirectories:mp3Files - ${mp3Files}`)
                     allFiles.push(...mp3Files);
                 } catch (e) {
                     console.log("Ошибка при чтении директории", dir, e);
