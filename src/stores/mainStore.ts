@@ -7,7 +7,13 @@ import { Filesystem } from "@capacitor/filesystem";
 import { Preferences } from "@capacitor/preferences";
 import { extractMetadata, fadeOutAndStop } from "@/functions/main";
 
+import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
+
 const typesOfFormats = ["mp3", "ogg", "wav"];
+
+function generateAudioId(): string {
+    return Math.ceil(Math.random() * 10000000).toString();
+}
 
 export const useMusicPlayer = defineStore("musicPlayer", () => {
     const files = ref<MusicFile[]>([]);
@@ -17,19 +23,99 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
     const isPlaying = ref(false);
     const duration = ref("--/--");
     const isSongPageFullScreen = ref(true);
-    let activePlayId = 0;
+
+    const volume = ref(1);
+
+    const audioId = ref("0");
 
     const name = ref<string>("");
+    const isInitialized = ref(false);
     const author = ref<string>("");
     const imageUrl = ref<string>("");
     const title = ref<string>("");
 
     const biteColor = ref<string>("");
 
+    let currentPositionIntervalId: any;
+
     const playlists = ref<
         { id: string; name: string; image?: string; trackPaths: string[] }[]
     >([]);
-    const currentPlaylist : Ref<{ id: string; name: string; trackPaths: string[] } | null> = ref(null);
+    const currentPlaylist: Ref<{
+        id: string;
+        name: string;
+        trackPaths: string[];
+    } | null> = ref(null);
+
+    const _changeCurrentFile = (file : MusicFile) => {
+        name.value = file.title || file.name.replace(".mp3", "");
+        author.value = file.author || "Неизвестный автор";
+        imageUrl.value = file.imageUrl || "";
+        title.value = file.title || "";
+
+        currentFile.value = file;
+    }
+
+    async function initialize(src: string, title: string = "No title", albumTitle : string | undefined = undefined, artistName : string | undefined = undefined): Promise<void> {
+        isInitialized.value = true;
+        audioId.value = generateAudioId();
+
+        await AudioPlayer.create({
+            audioId: audioId.value,
+            audioSource: src,
+            albumTitle: albumTitle,
+            artistName: artistName,
+            friendlyTitle: albumTitle || title,
+            useForNotification: true,
+            isBackgroundMusic: false,
+            loop: false,
+            showSeekForward: true,
+            showSeekBackward: true,
+            seekBackwardTime: 1,
+            seekForwardTime: 1,
+        }).catch((ex: Error) => console.log(ex.message));
+
+        console.log("created!", audioId.value);
+
+        AudioPlayer.onAudioEnd(
+            { audioId: audioId.value },
+            async () => {
+                await nextTrack();
+            },
+        );
+
+        AudioPlayer.onPlaybackStatusChange(
+            { audioId: audioId.value },
+            (result) => {
+                switch (result.status) {
+                    case "playing":
+                        AudioPlayer.play({ audioId: audioId.value });
+
+                        break;
+                    case "paused":
+                        AudioPlayer.pause({ audioId: audioId.value });
+
+                        break;
+                    case "stopped":
+                        AudioPlayer.stop({ audioId: audioId.value });
+                        break;
+                    default:
+                        AudioPlayer.stop({ audioId: audioId.value });
+                        break;
+                }
+            },
+        );
+
+        
+
+        AudioPlayer.onMetadataUpdate({ audioId: audioId.value }, (result) => {
+            console.log(result);
+        });
+
+        await AudioPlayer.initialize({ audioId: audioId.value }).catch((ex) =>
+            console.log(ex.message),
+        );
+    }
 
     const addPlaylist = (
         name: string,
@@ -68,7 +154,9 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         try {
             console.log("Start loadMusicFromDirectories()");
             const { value } = await Preferences.get({ key: "directories" });
-            console.log(`mainStore.ts:loadMusicFromDirectories:value - ${value}`)
+            console.log(
+                `mainStore.ts:loadMusicFromDirectories:value - ${value}`,
+            );
             if (!value) return;
 
             const dirs: string[] = JSON.parse(value);
@@ -82,9 +170,14 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                     });
 
                     const mp3Files = result.files
-                        .filter(
-                            (f) =>
-                                typesOfFormats.includes(f.name.split(".")[f.name.split(".").length - 1].toLowerCase()),
+                        .filter((f) =>
+                            typesOfFormats.includes(
+                                f.name
+                                    .split(".")
+                                    [
+                                        f.name.split(".").length - 1
+                                    ].toLowerCase(),
+                            ),
                         )
                         .map((f) => ({
                             name: f.name,
@@ -129,7 +222,9 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
     const loadMetadataWithCache = async (file: MusicFile) => {
         const cacheKey = `meta:${file.name}`;
-        const fileFormat = file.name.split(".")[file.name.split(".").length - 1].toLowerCase();
+        const fileFormat = file.name
+            .split(".")
+            [file.name.split(".").length - 1].toLowerCase();
         try {
             const cache = await Preferences.get({ key: cacheKey });
             if (cache.value) {
@@ -138,6 +233,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                 file.author = meta.author;
                 file.imageUrl = meta.imageUrl;
                 file.isImageLoaded = !!meta.imageUrl;
+                console.log(imageUrl.value, meta.imageUrl);
                 return;
             }
 
@@ -149,13 +245,16 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
             file.base64 = `data:audio/${fileFormat};base64,${content.data}`;
             const blob = await fetch(file.base64).then((res) => res.blob());
-            const fileObj = new File([blob], file.name, { type: `audio/${fileFormat}` });
+            const fileObj = new File([blob], file.name, {
+                type: `audio/${fileFormat}`,
+            });
 
             const meta = await extractMetadata(fileObj);
             file.title = meta.title;
             file.author = meta.artist;
             file.imageUrl = meta.imageUrl;
             file.isImageLoaded = !!meta.imageUrl;
+            
 
             // Сохраняем в Preferences
             await Preferences.set({
@@ -195,7 +294,22 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         const currentIdx = currentIndex.value;
         const nextIdx = (currentIdx + 1) % playlistFiles.length;
-        await play(playlistFiles[nextIdx]);
+
+        if (isInitialized.value) {
+            await stop();
+        }
+        
+        _changeCurrentFile(playlistFiles[nextIdx]);
+        
+
+        if (!isInitialized.value) {
+            await initialize(playlistFiles[nextIdx].path, playlistFiles[nextIdx].name, playlistFiles[nextIdx].title, playlistFiles[nextIdx].author);
+        }
+
+        await AudioPlayer.play({ audioId: audioId.value });
+        isPlaying.value = true;
+
+        startTimeUpdate();
     };
 
     const prevTrack = async () => {
@@ -205,10 +319,24 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         const currentIdx = currentIndex.value;
         const prevIdx =
             (currentIdx - 1 + playlistFiles.length) % playlistFiles.length;
-        await play(playlistFiles[prevIdx]);
+
+        if (isInitialized.value) {
+            await stop();
+        }
+
+        _changeCurrentFile(playlistFiles[prevIdx]);
+
+        if (!isInitialized.value) {
+            await initialize(playlistFiles[prevIdx].path, playlistFiles[prevIdx].name, playlistFiles[prevIdx].title, playlistFiles[prevIdx].author);
+        }
+        
+
+        await AudioPlayer.play({ audioId: audioId.value });
+        isPlaying.value = true;
+
+        startTimeUpdate();
     };
 
-    // stores/mainStore.ts
     const removeTrackFromPlaylist = (playlistId: string, trackPath: string) => {
         const playlist = playlists.value.find((p) => p.id === playlistId);
         if (playlist) {
@@ -228,96 +356,76 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
     };
 
     const play = async (file: MusicFile) => {
-        if (currentPlaylist.value) {
-            const playlistIndex = playlists.value.findIndex(
-                (p) => p.id === currentPlaylist.value?.id,
-            );
-            if (playlistIndex > -1) {
-                currentPlaylist.value = playlists.value[playlistIndex];
-            }
+        if (isInitialized.value) {
+            await stop();
         }
 
-        activePlayId++;
-        const thisPlayId = activePlayId;
+        _changeCurrentFile(file);
 
-        await stop();
-
-        name.value = file.title || file.name.replace(".mp3", "");
-        author.value = file.author || "Неизвестный автор";
-        imageUrl.value = file.imageUrl || "";
-        title.value = file.title || "";
-
-        // Только теперь читаем песню
-        if (!file.base64) {
-            const content = await Filesystem.readFile({
-                path: "file://" + file.path,
-                directory: undefined,
-            });
-            if (thisPlayId !== activePlayId) return;
-            file.base64 = `data:audio/mp3;base64,${content.data}`;
+        if (!isInitialized.value) {
+            await initialize(file.path, file.name, file.title, file.author);
         }
 
-        currentFile.value = file;
+        await AudioPlayer.play({ audioId: audioId.value });
+        isPlaying.value = true;
 
-        if (thisPlayId !== activePlayId) return;
+        startTimeUpdate();
 
-        const audio = new Audio(file.base64);
-        currentAudio.value = audio;
-
-        audio.onended = async () => {
-            isPlaying.value = false;
-            progress.value = 0;
-            await fadeOutAndStop(audio);
-            nextTrack();
-        };
-
-        audio.ontimeupdate = () => {
-            if (audio.duration && isPlaying.value) {
-                progress.value = (audio.currentTime / audio.duration) * 100;
-                duration.value = `${String(Math.floor(audio.currentTime / 60)).padStart(2, "0")}:${String(Math.floor(audio.currentTime % 60)).padStart(2, "0")}/${String(Math.floor(audio.duration / 60)).padStart(2, "0")}:${String(Math.floor(audio.duration % 60)).padStart(2, "0")}`;
-            }
-        };
-
-        await audio.play();
         isPlaying.value = true;
     };
 
-    const stop = () => {
-        return new Promise<void>(async (resolve) => {
-            if (currentAudio.value) {
-                await fadeOutAndStop(currentAudio.value);
-                currentAudio.value.pause();
-                currentAudio.value.currentTime = 0;
-                currentAudio.value.src = "";
-                currentAudio.value.load();
-                currentAudio.value = null;
-            }
-            isPlaying.value = false;
-            progress.value = 0;
-            duration.value = "--/--";
-            resolve();
+    const stop = async () => {
+        isInitialized.value = false;
+        stopTimeUpdate();
+        await AudioPlayer.destroy({ audioId: audioId.value }).catch((e) => {
+            console.log(e.message);
         });
     };
 
-    const togglePlay = () => {
-        if (currentAudio.value) {
+    const startTimeUpdate = () => {
+        stopTimeUpdate();
+
+        currentPositionIntervalId = globalThis.setInterval(async () => {
             if (isPlaying.value) {
-                currentAudio.value.pause();
-                isPlaying.value = false;
-            } else {
-                currentAudio.value.play();
-                isPlaying.value = true;
+                let curTime = (
+                    await AudioPlayer.getCurrentTime({ audioId: audioId.value })
+                ).currentTime;
+                let dur = (
+                    await AudioPlayer.getDuration({ audioId: audioId.value })
+                ).duration;
+                progress.value = (curTime / dur) * 100;
+                duration.value = `${String(Math.floor(curTime / 60)).padStart(2, "0")}:${String(Math.floor(curTime % 60)).padStart(2, "0")}/${String(Math.floor(dur / 60)).padStart(2, "0")}:${String(Math.floor(dur % 60)).padStart(2, "0")}`;
             }
+        }, 1000);
+    };
+
+    const stopTimeUpdate = () => {
+        clearInterval(currentPositionIntervalId);
+        currentPositionIntervalId = 0;
+
+        progress.value = 0;
+        duration.value = "--/--";
+    };
+
+    const togglePlay = async () => {
+        if (isPlaying.value) {
+            await AudioPlayer.pause({ audioId: audioId.value });
+            isPlaying.value = false;
+        } else {
+            await AudioPlayer.play({ audioId: audioId.value });
+            isPlaying.value = true;
         }
     };
 
-    const updateProgress = (event: any) => {
+    const updateProgress = async (event: any) => {
         isPlaying.value = false;
-        if (currentAudio.value) {
-            const curPercent = event.target.value;
-            currentAudio.value.currentTime =
-                (curPercent * currentAudio.value.duration) / 100;
-        }
+        const curPercent = event.target.value;
+        let dur = (await AudioPlayer.getDuration({ audioId: audioId.value }))
+            .duration;
+        AudioPlayer.seek({
+            audioId: audioId.value,
+            timeInSeconds: Math.ceil((curPercent * dur) / 100),
+        });
         isPlaying.value = true;
     };
 

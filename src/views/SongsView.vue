@@ -1,7 +1,8 @@
 <template>
     <div>
-        <Header @changeSearch="(val) => search = val"/>
-        <ul class="player__list" :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : { marginBottom: '100px' }">
+        <Header @changeSearch="(val) => search = val" />
+        <ul class="player__list"
+            :style="musicPlayer.isSongPageFullScreen ? { overflow: 'hidden' } : { marginBottom: '100px' }">
             <li v-for="file in musicPlayer.files" :key="file.name" class="player__item"
                 v-show="file.title.toLowerCase().includes(search.toLowerCase()) || file.name.toLowerCase().includes(search.toLowerCase()) || file.author.toLowerCase().includes(search.toLowerCase())"
                 @click="musicPlayer.play(file)">
@@ -14,14 +15,8 @@
                     </svg>
 
                     <!-- Картинка: по событию load ставим imageLoaded = true -->
-                    <img
-                        v-if="file.imageUrl && settingsStore.preferImage"
-                        v-show="file.isImageLoaded"
-                        :src="file.imageUrl"
-                        @load="file.isImageLoaded = true"
-                        style="display: block;"
-                        alt="song"
-                    />
+                    <img v-if="file.imageUrl" v-show="file.isImageLoaded" :src="file.imageUrl"
+                        @load="file.isImageLoaded = true" style="display: block;" alt="song" />
                 </div>
                 <div class="player__line"></div>
                 <div class="player__info">
@@ -38,10 +33,8 @@
 import { onMounted, ref, watch } from 'vue';
 import { useMusicPlayer } from '@/stores/mainStore';
 import Header from '@/components/Header.vue';
-import { useSettingsStore } from '@/stores/settingsStore';
 
 const musicPlayer = useMusicPlayer();
-const settingsStore = useSettingsStore();
 const search = ref<string>('');
 
 watch(() => musicPlayer.isSongPageFullScreen, (value) => {
@@ -60,7 +53,7 @@ onMounted(async () => {
 
     width: 100%;
 
-    
+
 
     &__list {
         margin-top: 50px;
