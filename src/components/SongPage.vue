@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { useMusicPlayer } from '@/stores/mainStore';
-import { ref, watch, onMounted, nextTick } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 
 const musicPlayer = useMusicPlayer();
 
+// Drag logic (без изменений)
 let startY = 0;
 const dragOffset = ref(0);
 const isDragging = ref(false);
-const transition = ref('transform 0.3s ease'); // плавность
+const transition = ref('transform 0.3s ease');
 const threshold = window.innerHeight / 4;
 
 const onTouchStart = (e: TouchEvent) => {
     startY = e.touches[0].clientY;
     isDragging.value = true;
-    transition.value = ''; // убираем transition на момент драга
+    transition.value = '';
 };
 
 const onTouchMove = (e: TouchEvent) => {
@@ -25,137 +26,89 @@ const onTouchMove = (e: TouchEvent) => {
 const onTouchEnd = () => {
     isDragging.value = false;
     transition.value = 'transform 0.3s ease';
-
     if (dragOffset.value > threshold) {
         musicPlayer.isSongPageFullScreen = false;
     }
-
     dragOffset.value = 0;
 };
 
 const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
-let audioCtx: AudioContext | null = null;
-let sourceNode: MediaElementAudioSourceNode | null = null;
-let analyser: AnalyserNode | null = null;
+let animationFrame: number | null = null;
 
-function createVisualizer(audio: HTMLAudioElement, canvas: HTMLCanvasElement) {
+function draw() {
+    const canvas = visualizerCanvas.value;
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    if (!audioCtx) {
-        audioCtx = new AudioContext();
-    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (!sourceNode) {
-        sourceNode = audioCtx.createMediaElementSource(audio);
-        analyser = audioCtx.createAnalyser();
-        sourceNode.connect(analyser);
-        analyser.connect(audioCtx.destination);
-        analyser.fftSize = 128;
-    }
+    let radius = 80;
+    let fillColor = musicPlayer.biteColor || '#3b82f6';
 
-    if (!analyser) return;
+    const analyser = musicPlayer.analyser;
+    const isAudioActive = musicPlayer.isPlaying && musicPlayer.audioContext?.state === 'running';
 
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    console.log('start draw');
 
-
-    function draw() {
-        if (!canvas || !ctx || !analyser) return;
-        requestAnimationFrame(draw);
-
+    if (analyser && isAudioActive) {
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
         analyser.getByteFrequencyData(dataArray);
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const average =
-            dataArray.reduce((sum, val) => sum + val, 0) / bufferLength;
-
-        const radius = 50 + average / 3;
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, Math.PI * 2);
-        ctx.fillStyle = `hsl(${Math.floor(average * 3)}, 80%, 60%)`;
-        musicPlayer.biteColor = `hsl(${Math.floor(average * 3)}, 80%, 60%)`;
-        ctx.fill();
+        const avg = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+        
+        radius = 50 + avg / 3;
+        fillColor = `hsl(${Math.floor(avg * 3)}, 80%, 60%)`;
+        musicPlayer.biteColor = fillColor;
+        console.log(dataArray.length, avg, radius, fillColor, musicPlayer.biteColor);
     }
 
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, Math.PI * 2);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
 
+    console.log('end draw');
 
-    draw();
+    animationFrame = requestAnimationFrame(draw);
 }
 
-
-// сброс transition при открытии
 watch(() => musicPlayer.isSongPageFullScreen, (val) => {
     if (val) {
-        transition.value = 'transform 0.3s ease';
+        if (!animationFrame) animationFrame = requestAnimationFrame(draw);
+    } else {
+        if (animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+        }
     }
-});
+}, { immediate: true });
 
 onMounted(() => {
     const canvas = visualizerCanvas.value;
-    if (canvas) {
-        // Следим за изменением размеров канваса
-        window.addEventListener('resize', () => {
-            if (canvas) {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-        });
-    }
+    if (!canvas) return;
+    const resize = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', resize);
+    resize();
 });
 
-watch(
-    () => visualizerCanvas.value,
-    (canvas) => {
-        if (canvas && musicPlayer.isSongPageFullScreen && musicPlayer.currentAudio) {
-            createVisualizer(musicPlayer.currentAudio, canvas);
-        }
-    }
-);
-
-
-
-
-watch(
-    () => musicPlayer.currentAudio,
-    async (newFile) => {
-        console.log('opened')
-        if (!newFile || !musicPlayer.currentFile) {
-            console.log(`NS! ${newFile} ${musicPlayer.currentFile}`)
-            return;
-        }    // Проверяем, что currentAudio существует
-        console.log('Started')
-        const audioEl = newFile;
-        const canvas = visualizerCanvas.value;
-
-        if (canvas && audioEl) {
-            // Закрываем предыдущий контекст, если есть
-            if (audioCtx) {
-                audioCtx.close();
-                audioCtx = null;
-                sourceNode = null;
-            }
-            await audioEl.play(); // Инициализация воспроизведения
-            createVisualizer(audioEl, canvas); // Запуск визуализатора
-        }
-    }
-);
-
-watch(
-    [() => visualizerCanvas.value, () => musicPlayer.currentAudio],
-    ([canvas, audio]) => {
-        if (!canvas || !audio) return;
-
-        // Пересоздаём визуализатор
-        createVisualizer(audio, canvas);
-    },
-    { immediate: true }
-);
-
-
-
-
+onUnmounted(() => {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    const canvas = visualizerCanvas.value;
+    if (!canvas) return;
+    const resize = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    };
+    window.removeEventListener('resize', resize);
+});
 </script>
+
 
 
 
@@ -229,9 +182,9 @@ watch(
 
                 <div class="sp__timeline">
                     <p @click="musicPlayer.isSongPageFullScreen = true">{{ musicPlayer.title.length > 20 ?
-                        musicPlayer.title.slice(0, 20) + '...' : musicPlayer.title}}</p>
+                        musicPlayer.title.slice(0, 20) + '...' : musicPlayer.title }}</p>
                     <p class="sp_author">{{ musicPlayer.author.length > 20 ? musicPlayer.author.slice(0, 20) + '...' :
-                        musicPlayer.author}}</p>
+                        musicPlayer.author }}</p>
                     <input type="range" @change="musicPlayer.updateProgress" v-model="musicPlayer.progress" max="100"
                         min="0" :style="{ '--progress': `${musicPlayer.progress}%` }" />
                     <p>{{ musicPlayer.duration }}</p>

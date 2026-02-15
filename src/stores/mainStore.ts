@@ -5,7 +5,11 @@ import { ref, computed, type Ref } from "vue";
 
 import { Filesystem } from "@capacitor/filesystem";
 import { Preferences } from "@capacitor/preferences";
-import { extractMetadata, fadeOutAndStop } from "@/functions/main";
+import {
+    base64ToBlob,
+    extractMetadata,
+    fadeOutAndStop,
+} from "@/functions/main";
 
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
 
@@ -47,16 +51,117 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         trackPaths: string[];
     } | null> = ref(null);
 
-    const _changeCurrentFile = (file : MusicFile) => {
+    const _changeCurrentFile = (file: MusicFile) => {
         name.value = file.title || file.name.replace(".mp3", "");
         author.value = file.author || "Неизвестный автор";
         imageUrl.value = file.imageUrl || "";
         title.value = file.title || "";
 
         currentFile.value = file;
+    };
+
+    // Очистка
+    function destroyHiddenAudio() {
+        if (hiddenAudio.value) {
+            hiddenAudio.value.pause();
+            hiddenAudio.value.src = "";
+            hiddenAudio.value.load();
+            hiddenAudio.value = null;
+        }
+        if (audioContext.value) {
+            audioContext.value.close();
+            audioContext.value = null;
+        }
+        sourceNode.value = null;
+        analyser.value = null;
     }
 
-    async function initialize(src: string, title: string = "No title", albumTitle : string | undefined = undefined, artistName : string | undefined = undefined): Promise<void> {
+    // Внутри стора useMusicPlayer (дополнение)
+    const hiddenAudio = ref<HTMLAudioElement | null>(null);
+    const audioContext = ref<AudioContext | null>(null);
+    const sourceNode = ref<MediaElementAudioSourceNode | null>(null);
+    const analyser = ref<AnalyserNode | null>(null);
+
+    // Функция инициализации скрытого аудио для текущего трека
+    async function initHiddenAudio(file: MusicFile) {
+        // Очищаем предыдущий
+        destroyHiddenAudio();
+
+        try {
+            // Загружаем файл как Blob (предполагаем, что путь доступен)
+            // Если путь локальный, можно использовать Filesystem.readFile
+            const content = await Filesystem.readFile({
+                path: "file://" + file.path,
+                directory: undefined,
+            });
+            file.base64 = `data:audio/mp3;base64,${content.data}`;
+
+            currentFile.value = file;
+
+            const audio = new Audio(file.base64);
+
+            audio.crossOrigin = "anonymous";
+            audio.loop = false;
+            audio.muted = true; // главное: без звука!
+            audio.preload = "auto";
+
+            // Создаём Web Audio контекст
+            const ctx = new AudioContext();
+            const src = ctx.createMediaElementSource(audio);
+            const analyserNode = ctx.createAnalyser();
+            analyserNode.fftSize = 128;
+            src.connect(analyserNode);
+            // Не подключаем к destination, чтобы не было звука
+            // analyserNode.connect(ctx.destination) – не делаем!
+
+            hiddenAudio.value = audio;
+            audioContext.value = ctx;
+            sourceNode.value = src;
+            analyser.value = analyserNode;
+
+            // Синхронизируем воспроизведение с основным плеером
+            if (isPlaying.value) {
+                await ctx.resume();
+                await audio.play();
+            }
+
+            // Слушаем события основного плеера (через watcher'ы или вызовы)
+        } catch (e) {
+            console.error("Ошибка инициализации скрытого аудио", e);
+        }
+    }
+
+    async function syncPlayPause() {
+        if (!hiddenAudio.value || !audioContext.value) return;
+        if (isPlaying.value) {
+            await audioContext.value.resume();
+            await hiddenAudio.value
+                .play()
+                .catch((e) => console.warn("hidden play error", e));
+        } else {
+            hiddenAudio.value.pause();
+            await audioContext.value.suspend();
+        }
+    }
+
+    // Синхронизация позиции (при перемотке)
+    async function syncSeek() {
+        if (!hiddenAudio.value || !audioContext.value) return;
+        // Получаем текущее время из основного плеера
+        const { currentTime } = await AudioPlayer.getCurrentTime({
+            audioId: audioId.value,
+        });
+        // Устанавливаем скрытому аудио (с небольшой задержкой)
+        hiddenAudio.value.currentTime = currentTime;
+        console.log("synced seek", audioContext.value.state);
+    }
+
+    async function initialize(
+        src: string,
+        title: string = "No title",
+        albumTitle: string | undefined = undefined,
+        artistName: string | undefined = undefined,
+    ): Promise<void> {
         isInitialized.value = true;
         audioId.value = generateAudioId();
 
@@ -77,12 +182,9 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         console.log("created!", audioId.value);
 
-        AudioPlayer.onAudioEnd(
-            { audioId: audioId.value },
-            async () => {
-                await nextTrack();
-            },
-        );
+        AudioPlayer.onAudioEnd({ audioId: audioId.value }, async () => {
+            await nextTrack();
+        });
 
         AudioPlayer.onPlaybackStatusChange(
             { audioId: audioId.value },
@@ -105,8 +207,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                 }
             },
         );
-
-        
 
         AudioPlayer.onMetadataUpdate({ audioId: audioId.value }, (result) => {
             console.log(result);
@@ -254,7 +354,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             file.author = meta.artist;
             file.imageUrl = meta.imageUrl;
             file.isImageLoaded = !!meta.imageUrl;
-            
 
             // Сохраняем в Preferences
             await Preferences.set({
@@ -298,12 +397,16 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         if (isInitialized.value) {
             await stop();
         }
-        
+
         _changeCurrentFile(playlistFiles[nextIdx]);
-        
 
         if (!isInitialized.value) {
-            await initialize(playlistFiles[nextIdx].path, playlistFiles[nextIdx].name, playlistFiles[nextIdx].title, playlistFiles[nextIdx].author);
+            await initialize(
+                playlistFiles[nextIdx].path,
+                playlistFiles[nextIdx].name,
+                playlistFiles[nextIdx].title,
+                playlistFiles[nextIdx].author,
+            );
         }
 
         await AudioPlayer.play({ audioId: audioId.value });
@@ -327,9 +430,13 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         _changeCurrentFile(playlistFiles[prevIdx]);
 
         if (!isInitialized.value) {
-            await initialize(playlistFiles[prevIdx].path, playlistFiles[prevIdx].name, playlistFiles[prevIdx].title, playlistFiles[prevIdx].author);
+            await initialize(
+                playlistFiles[prevIdx].path,
+                playlistFiles[prevIdx].name,
+                playlistFiles[prevIdx].title,
+                playlistFiles[prevIdx].author,
+            );
         }
-        
 
         await AudioPlayer.play({ audioId: audioId.value });
         isPlaying.value = true;
@@ -358,15 +465,18 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
     const play = async (file: MusicFile) => {
         if (isInitialized.value) {
             await stop();
+            destroyHiddenAudio();
         }
 
         _changeCurrentFile(file);
 
         if (!isInitialized.value) {
             await initialize(file.path, file.name, file.title, file.author);
+            await initHiddenAudio(file);
         }
 
         await AudioPlayer.play({ audioId: audioId.value });
+        await syncPlayPause();
         isPlaying.value = true;
 
         startTimeUpdate();
@@ -415,6 +525,8 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             await AudioPlayer.play({ audioId: audioId.value });
             isPlaying.value = true;
         }
+        await syncPlayPause();
+        console.log("togglePlay", (audioContext.value as AudioContext).state);
     };
 
     const updateProgress = async (event: any) => {
@@ -426,6 +538,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             audioId: audioId.value,
             timeInSeconds: Math.ceil((curPercent * dur) / 100),
         });
+        await syncSeek();
         isPlaying.value = true;
     };
 
@@ -459,5 +572,10 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         savePlaylists,
         removeTrackFromPlaylist,
         addTrackToPlaylist,
+
+        analyser,
+        audioContext,
+        sourceNode,
+        hiddenAudio,
     };
 });
