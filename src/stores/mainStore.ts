@@ -1,11 +1,12 @@
 // stores/mainStore.ts
 import type { MusicFile } from "@/composables/useMusicPlayer";
 import { defineStore } from "pinia";
-import { ref, computed, type Ref } from "vue";
+import { ref, computed, type Ref, watch } from "vue";
 
 import { Filesystem } from "@capacitor/filesystem";
 import { Preferences } from "@capacitor/preferences";
 import { extractMetadata, fadeOutAndStop } from "@/functions/main";
+import { Capacitor } from "@capacitor/core"; // Import for convertFileSrc
 
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
 
@@ -47,16 +48,23 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         trackPaths: string[];
     } | null> = ref(null);
 
-    const _changeCurrentFile = (file : MusicFile) => {
+    const isWebMain = ref(true); // Track if web audio is the audible main source
+
+    const _changeCurrentFile = (file: MusicFile) => {
         name.value = file.title || file.name.replace(".mp3", "");
         author.value = file.author || "Неизвестный автор";
         imageUrl.value = file.imageUrl || "";
         title.value = file.title || "";
 
         currentFile.value = file;
-    }
+    };
 
-    async function initialize(src: string, title: string = "No title", albumTitle : string | undefined = undefined, artistName : string | undefined = undefined): Promise<void> {
+    async function initialize(
+        src: string,
+        title: string = "No title",
+        albumTitle: string | undefined = undefined,
+        artistName: string | undefined = undefined,
+    ): Promise<void> {
         isInitialized.value = true;
         audioId.value = generateAudioId();
 
@@ -77,12 +85,9 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         console.log("created!", audioId.value);
 
-        AudioPlayer.onAudioEnd(
-            { audioId: audioId.value },
-            async () => {
-                await nextTrack();
-            },
-        );
+        AudioPlayer.onAudioEnd({ audioId: audioId.value }, async () => {
+            await nextTrack();
+        });
 
         AudioPlayer.onPlaybackStatusChange(
             { audioId: audioId.value },
@@ -106,8 +111,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             },
         );
 
-        
-
         AudioPlayer.onMetadataUpdate({ audioId: audioId.value }, (result) => {
             console.log(result);
         });
@@ -115,7 +118,59 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         await AudioPlayer.initialize({ audioId: audioId.value }).catch((ex) =>
             console.log(ex.message),
         );
+
+        // Set up parallel web audio for analysis
+        const webSrc = Capacitor.convertFileSrc(src);
+        currentAudio.value = new Audio(webSrc);
+        currentAudio.value.volume = 0; // Muted by default for analysis only
+        currentAudio.value.preload = "auto";
     }
+
+    // Function to switch web audio to main (audible) and pause native
+    async function switchToWebAsMain() {
+        if (!currentAudio.value || !isInitialized.value) return;
+        isWebMain.value = true;
+
+        // Sync time
+        const nativeTime = (
+            await AudioPlayer.getCurrentTime({ audioId: audioId.value })
+        ).currentTime;
+        currentAudio.value.currentTime = nativeTime;
+
+        // Pause native, unmute and play web
+        await AudioPlayer.pause({ audioId: audioId.value });
+        currentAudio.value.volume = volume.value; // Use store volume
+        await currentAudio.value.play();
+    }
+
+    // Function to switch back to native as main
+    async function switchToNativeAsMain() {
+        if (!currentAudio.value || !isInitialized.value) return;
+        isWebMain.value = false;
+
+        // Sync time
+        const webTime = currentAudio.value.currentTime;
+        await AudioPlayer.seek({
+            audioId: audioId.value,
+            timeInSeconds: webTime,
+        });
+
+        // Mute and pause web, play native
+        currentAudio.value.volume = 0;
+        currentAudio.value.pause();
+        await AudioPlayer.play({ audioId: audioId.value });
+    }
+
+    // Watch full screen to auto-switch
+    watch(isSongPageFullScreen, (isFull) => {
+        if (isPlaying.value) {
+            if (isFull) {
+                switchToWebAsMain();
+            } else {
+                switchToNativeAsMain();
+            }
+        }
+    });
 
     const addPlaylist = (
         name: string,
@@ -254,7 +309,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             file.author = meta.artist;
             file.imageUrl = meta.imageUrl;
             file.isImageLoaded = !!meta.imageUrl;
-            
 
             // Сохраняем в Preferences
             await Preferences.set({
@@ -298,18 +352,30 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         if (isInitialized.value) {
             await stop();
         }
-        
+
         _changeCurrentFile(playlistFiles[nextIdx]);
-        
 
         if (!isInitialized.value) {
-            await initialize(playlistFiles[nextIdx].path, playlistFiles[nextIdx].name, playlistFiles[nextIdx].title, playlistFiles[nextIdx].author);
+            await initialize(
+                playlistFiles[nextIdx].path,
+                playlistFiles[nextIdx].name,
+                playlistFiles[nextIdx].title,
+                playlistFiles[nextIdx].author,
+            );
         }
 
         await AudioPlayer.play({ audioId: audioId.value });
+        if (currentAudio.value) await currentAudio.value.play();
         isPlaying.value = true;
 
         startTimeUpdate();
+
+        // Apply switch based on current mode
+        if (isSongPageFullScreen.value) {
+            await switchToWebAsMain();
+        } else {
+            await switchToNativeAsMain();
+        }
     };
 
     const prevTrack = async () => {
@@ -327,14 +393,26 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         _changeCurrentFile(playlistFiles[prevIdx]);
 
         if (!isInitialized.value) {
-            await initialize(playlistFiles[prevIdx].path, playlistFiles[prevIdx].name, playlistFiles[prevIdx].title, playlistFiles[prevIdx].author);
+            await initialize(
+                playlistFiles[prevIdx].path,
+                playlistFiles[prevIdx].name,
+                playlistFiles[prevIdx].title,
+                playlistFiles[prevIdx].author,
+            );
         }
-        
 
         await AudioPlayer.play({ audioId: audioId.value });
+        if (currentAudio.value) await currentAudio.value.play();
         isPlaying.value = true;
 
         startTimeUpdate();
+
+        // Apply switch based on current mode
+        if (isSongPageFullScreen.value) {
+            await switchToWebAsMain();
+        } else {
+            await switchToNativeAsMain();
+        }
     };
 
     const removeTrackFromPlaylist = (playlistId: string, trackPath: string) => {
@@ -367,11 +445,19 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         }
 
         await AudioPlayer.play({ audioId: audioId.value });
+        console.log("play called for", currentAudio.value?.src);
+        if (currentAudio.value) await currentAudio.value.play();
+
         isPlaying.value = true;
 
         startTimeUpdate();
 
-        isPlaying.value = true;
+        // Apply switch based on current mode
+        if (isSongPageFullScreen.value) {
+            await switchToWebAsMain();
+        } else {
+            await switchToNativeAsMain();
+        }
     };
 
     const stop = async () => {
@@ -380,6 +466,11 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         await AudioPlayer.destroy({ audioId: audioId.value }).catch((e) => {
             console.log(e.message);
         });
+        if (currentAudio.value) {
+            currentAudio.value.pause();
+            currentAudio.value.src = ""; // Clean up
+            currentAudio.value = null;
+        }
     };
 
     const startTimeUpdate = () => {
@@ -387,14 +478,40 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         currentPositionIntervalId = globalThis.setInterval(async () => {
             if (isPlaying.value) {
-                let curTime = (
-                    await AudioPlayer.getCurrentTime({ audioId: audioId.value })
-                ).currentTime;
-                let dur = (
-                    await AudioPlayer.getDuration({ audioId: audioId.value })
-                ).duration;
+                let curTime: number;
+                if (isWebMain.value && currentAudio.value) {
+                    curTime = currentAudio.value.currentTime;
+                } else {
+                    curTime = (
+                        await AudioPlayer.getCurrentTime({
+                            audioId: audioId.value,
+                        })
+                    ).currentTime;
+                }
+                let dur: number;
+                if (isWebMain.value && currentAudio.value) {
+                    dur = currentAudio.value.duration;
+                } else {
+                    dur = (
+                        await AudioPlayer.getDuration({
+                            audioId: audioId.value,
+                        })
+                    ).duration;
+                }
                 progress.value = (curTime / dur) * 100;
                 duration.value = `${String(Math.floor(curTime / 60)).padStart(2, "0")}:${String(Math.floor(curTime % 60)).padStart(2, "0")}/${String(Math.floor(dur / 60)).padStart(2, "0")}:${String(Math.floor(dur % 60)).padStart(2, "0")}`;
+
+                // Optional: Sync drift every 5s (adjust interval as needed)
+                if (currentPositionIntervalId % 5 === 0) {
+                    if (isWebMain.value && currentAudio.value) {
+                        AudioPlayer.seek({
+                            audioId: audioId.value,
+                            timeInSeconds: curTime,
+                        });
+                    } else if (currentAudio.value) {
+                        currentAudio.value.currentTime = curTime;
+                    }
+                }
             }
         }, 1000);
     };
@@ -409,10 +526,26 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
     const togglePlay = async () => {
         if (isPlaying.value) {
-            await AudioPlayer.pause({ audioId: audioId.value });
+            if (isWebMain.value && currentAudio.value) {
+                currentAudio.value.pause();
+            } else {
+                await AudioPlayer.pause({ audioId: audioId.value });
+            }
+            if (!isWebMain.value && currentAudio.value)
+                currentAudio.value.pause();
+            if (isWebMain.value)
+                await AudioPlayer.pause({ audioId: audioId.value });
             isPlaying.value = false;
         } else {
-            await AudioPlayer.play({ audioId: audioId.value });
+            if (isWebMain.value && currentAudio.value) {
+                await currentAudio.value.play();
+            } else {
+                await AudioPlayer.play({ audioId: audioId.value });
+            }
+            if (!isWebMain.value && currentAudio.value)
+                await currentAudio.value.play();
+            if (isWebMain.value)
+                await AudioPlayer.play({ audioId: audioId.value });
             isPlaying.value = true;
         }
     };
@@ -420,12 +553,27 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
     const updateProgress = async (event: any) => {
         isPlaying.value = false;
         const curPercent = event.target.value;
-        let dur = (await AudioPlayer.getDuration({ audioId: audioId.value }))
-            .duration;
-        AudioPlayer.seek({
-            audioId: audioId.value,
-            timeInSeconds: Math.ceil((curPercent * dur) / 100),
-        });
+        let dur: number;
+        if (isWebMain.value && currentAudio.value) {
+            dur = currentAudio.value.duration;
+            currentAudio.value.currentTime = (curPercent * dur) / 100;
+        } else {
+            dur = (await AudioPlayer.getDuration({ audioId: audioId.value }))
+                .duration;
+            await AudioPlayer.seek({
+                audioId: audioId.value,
+                timeInSeconds: Math.ceil((curPercent * dur) / 100),
+            });
+        }
+        // Sync the other player
+        if (currentAudio.value && !isWebMain.value) {
+            currentAudio.value.currentTime = (curPercent * dur) / 100;
+        } else if (isWebMain.value) {
+            await AudioPlayer.seek({
+                audioId: audioId.value,
+                timeInSeconds: currentAudio.value?.currentTime || 0,
+            });
+        }
         isPlaying.value = true;
     };
 
@@ -459,5 +607,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         savePlaylists,
         removeTrackFromPlaylist,
         addTrackToPlaylist,
+        switchToWebAsMain, // Expose if needed for manual control
+        switchToNativeAsMain,
     };
 });

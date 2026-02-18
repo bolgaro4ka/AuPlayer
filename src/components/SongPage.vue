@@ -118,7 +118,7 @@ watch(
 
 watch(
     () => musicPlayer.currentAudio,
-    async (newFile) => {
+    (newFile) => {
         console.log('opened')
         if (!newFile || !musicPlayer.currentFile) {
             console.log(`NS! ${newFile} ${musicPlayer.currentFile}`)
@@ -135,7 +135,7 @@ watch(
                 audioCtx = null;
                 sourceNode = null;
             }
-            await audioEl.play(); // Инициализация воспроизведения
+            // No need for extra play() here - store handles it
             createVisualizer(audioEl, canvas); // Запуск визуализатора
         }
     }
@@ -229,9 +229,9 @@ watch(
 
                 <div class="sp__timeline">
                     <p @click="musicPlayer.isSongPageFullScreen = true">{{ musicPlayer.title.length > 20 ?
-                        musicPlayer.title.slice(0, 20) + '...' : musicPlayer.title}}</p>
+                        musicPlayer.title.slice(0, 20) + '...' : musicPlayer.title }}</p>
                     <p class="sp_author">{{ musicPlayer.author.length > 20 ? musicPlayer.author.slice(0, 20) + '...' :
-                        musicPlayer.author}}</p>
+                        musicPlayer.author }}</p>
                     <input type="range" @change="musicPlayer.updateProgress" v-model="musicPlayer.progress" max="100"
                         min="0" :style="{ '--progress': `${musicPlayer.progress}%` }" />
                     <p>{{ musicPlayer.duration }}</p>
