@@ -48,7 +48,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         trackPaths: string[];
     } | null> = ref(null);
 
-    const isWebMain = ref(true); // Track if web audio is the audible main source
+    const isWebMain = ref(false); // Track if web audio is the audible main source
 
     const _changeCurrentFile = (file: MusicFile) => {
         name.value = file.title || file.name.replace(".mp3", "");
@@ -123,6 +123,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         const webSrc = Capacitor.convertFileSrc(src);
         currentAudio.value = new Audio(webSrc);
         currentAudio.value.volume = 0; // Muted by default for analysis only
+        currentAudio.value.muted = true;
         currentAudio.value.preload = "auto";
     }
 
@@ -139,6 +140,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         // Pause native, unmute and play web
         await AudioPlayer.pause({ audioId: audioId.value });
+         currentAudio.value.muted = false;
         currentAudio.value.volume = volume.value; // Use store volume
         await currentAudio.value.play();
     }
@@ -157,6 +159,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         // Mute and pause web, play native
         currentAudio.value.volume = 0;
+        currentAudio.value.muted = true;
         currentAudio.value.pause();
         await AudioPlayer.play({ audioId: audioId.value });
     }
