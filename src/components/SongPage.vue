@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMusicPlayer } from '@/stores/mainStore';
 import { ref, watch, onMounted, nextTick } from 'vue';
+import Visualizer from './Visualizer.vue';
 
 const musicPlayer = useMusicPlayer();
 
@@ -170,7 +171,7 @@ watch(
 
                 <div class="sp__image">
                     <img v-if="musicPlayer?.imageUrl" :src="musicPlayer?.imageUrl" alt="cover" />
-                    <canvas v-else ref="visualizerCanvas" class="sp__canvas" width="200" height="200"></canvas>
+                    <Visualizer v-else :mode="1" :isAnimated="!musicPlayer.isPlaying" />
                 </div>
 
                 <div class="sp__name">
@@ -264,8 +265,7 @@ watch(
                 <div class="sp__image">
                     <img v-if="musicPlayer?.imageUrl" :src="musicPlayer?.imageUrl" alt="cover"
                         style="height: 80px; width: 80px; background-size: cover;" />
-                    <canvas v-else ref="visualizerCanvas" class="sp__canvas" width="200" height="200"
-                        style="height: 80px; width: 80px;"></canvas>
+                    <Visualizer v-else :mode="1" :isAnimated="!musicPlayer.isPlaying"/>
                 </div>
 
             </div>
@@ -371,14 +371,17 @@ watch(
         flex-direction: column;
 
         .sp__image {
-            width: 100%;
-            height: 300px;
+            width: 80vw;
+            height: 80vw;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
 
             img {
-                width: 80vw;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
             }
         }
 
@@ -459,7 +462,6 @@ watch(
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                animation: little-move 10s linear infinite;
             }
 
 
@@ -550,6 +552,16 @@ watch(
     align-items: center;
     padding-left: 10px;
     padding-right: 10px;
+
+    .sp__image {
+        width: 80px;
+        height: 80px;
+        background-size: cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
 
     .sp_author {
         font-size: 8px;
