@@ -14,6 +14,7 @@ import { onMounted, ref, watch } from 'vue';
 import { useMusicPlayer } from '@/stores/mainStore';
 import Header from '@/components/Header.vue';
 import SongItem from '@/components/particles/SongItem.vue';
+import { AdvancedHaptics } from 'capacitor-advanced-haptics';
 
 const musicPlayer = useMusicPlayer();
 const search = ref<string>('');
@@ -24,6 +25,16 @@ watch(() => musicPlayer.isSongPageFullScreen, (value) => {
 
 onMounted(async () => {
     await musicPlayer.loadMusicFromDirectories();
+    let inv : any;
+    let i = 0;
+    
+    inv = setInterval(async () => {
+        await AdvancedHaptics.predefined({type: 'tick'})
+        i++
+        if (i >= 10) {
+            clearInterval(inv );
+        }
+    }, 200);
 });
 </script>
 

@@ -19,6 +19,7 @@
     "@capacitor/status-bar": "^7.0.4",
     "@capawesome/capacitor-file-picker": "^7.0.1",
     "@mediagrid/capacitor-native-audio": "^2.3.2",
+    "capacitor-advanced-haptics": "^0.0.5",
     "capacitor-file-picker": "^1.0.10",
     "capacitor-music-controls-plugin": "^6.1.0",
     "music-metadata": "^11.2.1",

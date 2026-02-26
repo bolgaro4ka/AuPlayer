@@ -17,6 +17,9 @@ project(':capawesome-capacitor-file-picker').projectDir = new File('../node_modu
 include ':mediagrid-capacitor-native-audio'
 project(':mediagrid-capacitor-native-audio').projectDir = new File('../node_modules/@mediagrid/capacitor-native-audio/android')
 
+include ':capacitor-advanced-haptics'
+project(':capacitor-advanced-haptics').projectDir = new File('../node_modules/capacitor-advanced-haptics/android')
+
 include ':capacitor-file-picker'
 project(':capacitor-file-picker').projectDir = new File('../node_modules/capacitor-file-picker/android')
 
