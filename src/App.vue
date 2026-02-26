@@ -4,9 +4,11 @@ import Sider from './components/Sider.vue';
 import SongPage from './components/SongPage.vue';
 import SplashScreen from './components/SplashScreen.vue';
 import { StatusBar } from '@capacitor/status-bar';
+import { setTheme } from './functions/colors';
 
 onMounted(async () => {
     await StatusBar.setOverlaysWebView({ overlay: false })
+    setTheme('dark');
 })
 
 </script>

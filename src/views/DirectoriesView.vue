@@ -54,11 +54,11 @@ async function onDirectorySelected(uri: string) {
 
 <style scoped lang="scss">
 .directories-view {
-    color: #fff;
+    color: var(--text-primary-color);
     height: 100%;
 
     p {
-        color: #aaa;
+        color: var(--text-secondary-color);
         margin-bottom: 20px;
         font-size: 12px;
     }
@@ -78,7 +78,7 @@ async function onDirectorySelected(uri: string) {
 
         li {
             width: 100vw;
-            border-top: 1px solid #444;
+            border-top: 1px solid var(--outline-color);
             min-height: 50px;
             display: flex;
             align-items: center;
@@ -94,9 +94,9 @@ async function onDirectorySelected(uri: string) {
         width: 100vw;
         height: 50px;
         text-align: center;
-        background-color: #444;
+        background-color: var(--primary-color);
         border: none;
-        color: #fff;
+        color: var(--on-primary-color);
         cursor: pointer;
     }
 

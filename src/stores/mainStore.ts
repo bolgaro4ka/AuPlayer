@@ -5,7 +5,7 @@ import { ref, computed, type Ref } from "vue";
 
 import { Filesystem } from "@capacitor/filesystem";
 import { Preferences } from "@capacitor/preferences";
-import { extractMetadata, fadeOutAndStop } from "@/functions/main";
+import { extractMetadata } from "@/functions/main";
 
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
 
@@ -34,6 +34,18 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
     const imageUrl = ref<string>("");
     const title = ref<string>("");
 
+    const colors : Ref<{ primary: string; surface: string; background: string; onPrimary: string; secondary: string; tertiary: string; outline: string; textPrimary: string; textSecondary: string; }> = ref({
+        primary: "#1db954",
+        surface: "#282828",
+        background: "#121212",
+        onPrimary: "#ffffff",
+        secondary: "#181818",
+        tertiary: "#282828",
+        outline: "#282828",
+        textPrimary: "#ffffff",
+        textSecondary: "#b3b3b3",
+    })
+
     const biteColor = ref<string>("");
 
     let currentPositionIntervalId: any;
@@ -47,16 +59,21 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         trackPaths: string[];
     } | null> = ref(null);
 
-    const _changeCurrentFile = (file : MusicFile) => {
+    const _changeCurrentFile = (file: MusicFile) => {
         name.value = file.title || file.name.replace(".mp3", "");
         author.value = file.author || "Неизвестный автор";
         imageUrl.value = file.imageUrl || "";
         title.value = file.title || "";
 
         currentFile.value = file;
-    }
+    };
 
-    async function initialize(src: string, title: string = "No title", albumTitle : string | undefined = undefined, artistName : string | undefined = undefined): Promise<void> {
+    async function initialize(
+        src: string,
+        title: string = "No title",
+        albumTitle: string | undefined = undefined,
+        artistName: string | undefined = undefined,
+    ): Promise<void> {
         isInitialized.value = true;
         audioId.value = generateAudioId();
 
@@ -77,12 +94,9 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
 
         console.log("created!", audioId.value);
 
-        AudioPlayer.onAudioEnd(
-            { audioId: audioId.value },
-            async () => {
-                await nextTrack();
-            },
-        );
+        AudioPlayer.onAudioEnd({ audioId: audioId.value }, async () => {
+            await nextTrack();
+        });
 
         AudioPlayer.onPlaybackStatusChange(
             { audioId: audioId.value },
@@ -105,8 +119,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                 }
             },
         );
-
-        
 
         AudioPlayer.onMetadataUpdate({ audioId: audioId.value }, (result) => {
             console.log(result);
@@ -254,7 +266,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             file.author = meta.artist;
             file.imageUrl = meta.imageUrl;
             file.isImageLoaded = !!meta.imageUrl;
-            
 
             // Сохраняем в Preferences
             await Preferences.set({
@@ -298,12 +309,16 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         if (isInitialized.value) {
             await stop();
         }
-        
+
         _changeCurrentFile(playlistFiles[nextIdx]);
-        
 
         if (!isInitialized.value) {
-            await initialize(playlistFiles[nextIdx].path, playlistFiles[nextIdx].name, playlistFiles[nextIdx].title, playlistFiles[nextIdx].author);
+            await initialize(
+                playlistFiles[nextIdx].path,
+                playlistFiles[nextIdx].name,
+                playlistFiles[nextIdx].title,
+                playlistFiles[nextIdx].author,
+            );
         }
 
         await AudioPlayer.play({ audioId: audioId.value });
@@ -327,9 +342,13 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         _changeCurrentFile(playlistFiles[prevIdx]);
 
         if (!isInitialized.value) {
-            await initialize(playlistFiles[prevIdx].path, playlistFiles[prevIdx].name, playlistFiles[prevIdx].title, playlistFiles[prevIdx].author);
+            await initialize(
+                playlistFiles[prevIdx].path,
+                playlistFiles[prevIdx].name,
+                playlistFiles[prevIdx].title,
+                playlistFiles[prevIdx].author,
+            );
         }
-        
 
         await AudioPlayer.play({ audioId: audioId.value });
         isPlaying.value = true;
@@ -417,14 +436,13 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         }
     };
 
-    const updateProgress = async (event: any) => {
+    const updateProgress = async (value: number) => {
         isPlaying.value = false;
-        const curPercent = event.target.value;
-        let dur = (await AudioPlayer.getDuration({ audioId: audioId.value }))
+        const dur = (await AudioPlayer.getDuration({ audioId: audioId.value }))
             .duration;
-        AudioPlayer.seek({
+        await AudioPlayer.seek({
             audioId: audioId.value,
-            timeInSeconds: Math.ceil((curPercent * dur) / 100),
+            timeInSeconds: Math.ceil((value * dur) / 100),
         });
         isPlaying.value = true;
     };
@@ -459,5 +477,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         savePlaylists,
         removeTrackFromPlaylist,
         addTrackToPlaylist,
+        colors
     };
 });

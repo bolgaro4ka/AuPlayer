@@ -84,6 +84,6 @@ const props = defineProps<{
     width: calc(100% - 32px);
     height: 1px;
     margin: 5px 16px;
-    border: 1px solid #444;
+    border: 1px solid var(--outline-color);
 }
 </style>

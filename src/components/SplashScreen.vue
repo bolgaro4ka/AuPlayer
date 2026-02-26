@@ -33,7 +33,7 @@ onMounted(() => {
 .splash-screen {
     position: fixed;
     inset: 0;
-    background-color: black;
+    background-color: var(--background-color);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -101,13 +101,13 @@ onMounted(() => {
     left: 4%;
 
     h2 {
-        color: white;
+        color: var(--text-primary-color);
         font-size: 70px;
         font-weight: normal;
     }
 
     p {
-        color: white;
+        color: var(--text-secondary-color);
         font-size: 20px;
         font-weight: 300;
     }

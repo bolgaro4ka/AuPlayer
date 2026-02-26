@@ -47,7 +47,7 @@ const emits = defineEmits(['changeSearch'])
         position: fixed;
         top: env(safe-area-inset-top);
         left: 0;
-        background-color: #333;
+        background-color: var(--surface-color);
 
         h2 {
             font-size: 30px;
@@ -57,9 +57,9 @@ const emits = defineEmits(['changeSearch'])
         input {
             width: 100%;
             height: 100%;
-            background: #333;
+            background: var(--surface-color);
             border: none;
-            color: white;
+            color: var(--text-primary-color);
             font-size: 24px;
             font-weight: 900;
             padding: 0 1rem;
