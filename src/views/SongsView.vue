@@ -48,7 +48,7 @@ onMounted(async () => {
 
 
     &__list {
-        margin-top: 50px;
+        margin-top: calc(55px);
         list-style: none;
         width: 100%;
         padding: 0;

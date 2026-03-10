@@ -230,13 +230,17 @@ const onDrag = (e: MouseEvent | TouchEvent): void => {
 
 const stopDrag = (): void => {
     isDragging.value = false;
+    removeDragListeners();
+    // Генерируем событие change после окончания перетаскивания
+    emit('change', props.modelValue);
+};
+
+const removeDragListeners = (): void => {
     window.removeEventListener('mousemove', onDrag);
     window.removeEventListener('mouseup', stopDrag);
     window.removeEventListener('touchmove', onDrag);
     window.removeEventListener('touchend', stopDrag);
-    // Генерируем событие change после окончания перетаскивания
-    emit('change', props.modelValue);
-};
+}
 
 const setValueFromEvent = (e: MouseEvent | TouchEvent): void => {
     if (!container.value) return;
@@ -297,7 +301,7 @@ onMounted(() => {
 onUnmounted(() => {
     stopAnimation();
     resizeObserver.disconnect();
-    stopDrag();
+    removeDragListeners();
 });
 </script>
 

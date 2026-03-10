@@ -60,7 +60,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
     } | null> = ref(null);
 
     const _changeCurrentFile = (file: MusicFile) => {
-        name.value = file.title || file.name.replace(".mp3", "");
+        name.value = file.title || file.name.replace(`.${file.name.split(".")[file.name.split(".").length - 1]}`, "");
         author.value = file.author || "Неизвестный автор";
         imageUrl.value = file.imageUrl || "";
         title.value = file.title || "";
@@ -104,17 +104,17 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                 switch (result.status) {
                     case "playing":
                         AudioPlayer.play({ audioId: audioId.value });
+                        isPlaying.value = true;
 
                         break;
                     case "paused":
                         AudioPlayer.pause({ audioId: audioId.value });
+                        isPlaying.value = false;
 
-                        break;
-                    case "stopped":
-                        AudioPlayer.stop({ audioId: audioId.value });
                         break;
                     default:
                         AudioPlayer.stop({ audioId: audioId.value });
+                        isPlaying.value = false;
                         break;
                 }
             },
@@ -415,7 +415,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
                 progress.value = (curTime / dur) * 100;
                 duration.value = `${String(Math.floor(curTime / 60)).padStart(2, "0")}:${String(Math.floor(curTime % 60)).padStart(2, "0")}/${String(Math.floor(dur / 60)).padStart(2, "0")}:${String(Math.floor(dur % 60)).padStart(2, "0")}`;
             }
-        }, 1000);
+        }, 500);
     };
 
     const stopTimeUpdate = () => {
@@ -444,6 +444,7 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
             audioId: audioId.value,
             timeInSeconds: Math.ceil((value * dur) / 100),
         });
+
         isPlaying.value = true;
     };
 
