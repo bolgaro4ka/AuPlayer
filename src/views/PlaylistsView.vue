@@ -117,10 +117,10 @@ const filteredTracks = computed(() =>
     width: 100vw;
     height: 50px;
     text-align: center;
-    background-color: #444;
+    background-color: var(--primary-color);
     border: none;
     color: #fff;
-    cursor: pointer;
+    cursor: var(--on-primary-color);
 }
 
 .playlist-image {

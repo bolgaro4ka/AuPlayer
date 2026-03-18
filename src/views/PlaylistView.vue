@@ -5,19 +5,23 @@ import type { MusicFile } from "@/composables/useMusicPlayer";
 import Modal from '@/components/Modal.vue'
 import { ref, computed, watchEffect, onMounted } from 'vue'
 import { storeToRefs } from 'pinia';
+import PlayButton from '@/components/PlayButton.vue';
 
 const route = useRoute()
 const {
     playlists,
     currentPlaylist,
-    files
+    files,
+    isPlaying,
+    currentFile
 } = storeToRefs(useMusicPlayer())
 
 const {
     savePlaylists,
     getTracksFromPlaylist,
     play,
-    loadPlaylists
+    loadPlaylists,
+    togglePlay
 } = useMusicPlayer()
 
 // Инициализация данных
@@ -109,14 +113,27 @@ const removeFromPlaylist = (trackPath: string) => {
         savePlaylists()
     }
 }
+
+onMounted(() => {
+    console.log(playlists.value.find(p => p.id === route.params.id)?.image, route.params.id)
+})
 </script>
 
 <template>
     <div class="playlist-view">
         <div v-if="tracks.length">
             <div class="header">
+                <img v-if="currentPlaylist?.id" :src="playlists.find(p => p.id === route.params.id)?.image || 'default_playlist_cover.png'" alt="Обложка плейлиста" class="playlist-image" />
                 <h1>{{ currentPlaylist?.name || 'Плейлист' }}</h1>
-                <button @click="openEditor" class="edit-button">✎ Изменить</button>
+                <div class="buttons">
+                    <div @click="currentFile ? togglePlay() : play(tracks[0])" class="play-button" style="background-color: transparent; outline: none;">
+                        <PlayButton />
+                    </div>
+                    <button @click="openEditor" class="edit-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>
+                    </button>
+                </div>
+                
             </div>
 
             <div v-for="(track, index) in tracks" :key="track.path" class="track-item" draggable="true"
@@ -173,8 +190,14 @@ const removeFromPlaylist = (trackPath: string) => {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-direction: column;
         margin-bottom: 20px;
+        gap: 15px;
         padding: 0 10px;
+
+        .buttons {
+            display: flex;
+        }
 
         h1 {
             margin: 0;
@@ -182,17 +205,27 @@ const removeFromPlaylist = (trackPath: string) => {
             color: #fff;
         }
 
+        img {
+            width: 50vw;
+            height: 50vw;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
         .edit-button {
-            background: #4CAF50;
+            background: var(--primary-color);
             border: none;
             padding: 8px 15px;
             border-radius: 5px;
-            color: white;
             cursor: pointer;
             transition: background 0.2s;
 
+            svg {
+                fill: var(--on-primary-color);
+            }
+
             &:hover {
-                background: #45a049;
+                background: var(--secondary-color);
             }
         }
     }
