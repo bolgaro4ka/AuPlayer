@@ -469,7 +469,6 @@ export const useMusicPlayer = defineStore("musicPlayer", () => {
         author,
         imageUrl,
         title,
-        biteColor,
         playlists,
         addPlaylist,
         getTracksFromPlaylist,

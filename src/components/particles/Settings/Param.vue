@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { type PropType } from 'vue';
+import MSwitch from '../CWrappers/MSwitch.vue';
 
 const props = defineProps({
     sType: {
@@ -44,7 +45,7 @@ const emits = defineEmits(['changeCheckbox', 'changeSlider']);
             </div>
         </div>
         <div v-if="props?.sType === 'checkbox'" class="param__checkbox">
-            <input type="checkbox" :checked="Boolean(currentValue)" @change="emits('changeCheckbox', ($event.target as HTMLInputElement).checked)">
+            <MSwitch :model-value="Boolean(currentValue)" @update:modelValue="emits('changeCheckbox', $event)" />
         </div>
     </div>
 </template>
@@ -57,7 +58,6 @@ const emits = defineEmits(['changeCheckbox', 'changeSlider']);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 60px;
-    padding: 0px 10px;
+    padding: 10px 10px;
 }
 </style>

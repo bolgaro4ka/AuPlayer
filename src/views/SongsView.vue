@@ -23,19 +23,7 @@ watch(() => musicPlayer.isSongPageFullScreen, (value) => {
     document.body.style.overflow = value ? 'hidden' : '';
 });
 
-onMounted(async () => {
-    await musicPlayer.loadMusicFromDirectories();
-    let inv : any;
-    let i = 0;
-    
-    inv = setInterval(async () => {
-        await AdvancedHaptics.predefined({type: 'tick'})
-        i++
-        if (i >= 10) {
-            clearInterval(inv );
-        }
-    }, 200);
-});
+
 </script>
 
 <style lang="scss" scoped>

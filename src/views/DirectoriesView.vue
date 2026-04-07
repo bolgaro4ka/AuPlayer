@@ -1,6 +1,6 @@
 <template>
     <div class="directories-view">
-        <h1 :style="{ color: musicPlayer.biteColor }">Репозитории</h1>
+        <h1>Репозитории</h1>
         <p>Здесь пути по которым ищется музыка</p>
         <ul>
             <li v-for="dir in directories" :key="dir">📁 {{ dir }}</li>
@@ -66,6 +66,7 @@ async function onDirectorySelected(uri: string) {
     h1 {
         margin-top: 20px;
         margin-bottom: 10px;
+        color: var(--text-primary-color);
     }
 
     h1,

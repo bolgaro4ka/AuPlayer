@@ -118,8 +118,8 @@ const filteredTracks = computed(() =>
     height: 50px;
     text-align: center;
     background-color: var(--primary-color);
+    color: var(--on-primary-color);
     border: none;
-    color: #fff;
     cursor: var(--on-primary-color);
 }
 

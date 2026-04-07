@@ -15,7 +15,7 @@ const emits = defineEmits(['changeSearch'])
 
         </div>
         <div class="player__search">
-            <h2 :style="{ color: musicPlayer.biteColor }">AuPlayer</h2>
+            <h2>AuPlayer</h2>
             <input type="text" v-model="search" placeholder="Найти" @change="emits('changeSearch', search)">
             <div @click="search = ''" v-if="search">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"

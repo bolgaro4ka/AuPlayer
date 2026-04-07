@@ -18,14 +18,31 @@
 </template>
 
 <script setup lang="ts">
+import { useMusicPlayer } from '@/stores/mainStore';
+import { AdvancedHaptics } from 'capacitor-advanced-haptics';
 import { ref, onMounted } from 'vue';
 
 const visible = ref(true);
+const musicPlayer = useMusicPlayer();
 
 onMounted(() => {
     setTimeout(() => {
         visible.value = false;
-    }, 3000);
+    }, 1000);
+});
+
+onMounted(async () => {
+    await musicPlayer.loadMusicFromDirectories();
+    let inv : any;
+    let i = 0;
+    
+    inv = setInterval(async () => {
+        await AdvancedHaptics.predefined({type: 'tick'})
+        i++
+        if (i >= 3) {
+            clearInterval(inv );
+        }
+    }, 200);
 });
 </script>
 

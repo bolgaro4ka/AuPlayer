@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMusicPlayer } from '@/stores/mainStore';
-import { ref, watch, onMounted, nextTick, type Ref } from 'vue';
+import { ref, watch, type Ref } from 'vue';
 import Visualizer from './Visualizer.vue';
 import GRange from './particles/GRange.vue';
 import { setTheme } from '@/functions/colors';
@@ -15,6 +15,8 @@ const transition = ref('transform 0.3s ease'); // плавность
 const threshold = window.innerHeight / 4;
 
 const imageComponent : Ref<HTMLImageElement | null> = ref(null);
+
+
 
 const onTouchStart = (e: TouchEvent) => {
     startY = e.touches[0].clientY;
@@ -75,7 +77,7 @@ function handlePrev() {
 
 <template>
     <div class="sp">
-        <div v-if="musicPlayer.isSongPageFullScreen && musicPlayer.currentFile" class="sp__wrapper-full" :style="{
+        <div v-show="musicPlayer.isSongPageFullScreen && musicPlayer.currentFile" class="sp__wrapper-full" :style="{
             transform: `translateY(${dragOffset}px)`,
             transition: transition
         }" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
@@ -137,7 +139,7 @@ function handlePrev() {
                 </div>
             </div>
         </div>
-        <div v-else-if="!musicPlayer.isSongPageFullScreen && musicPlayer.currentFile" class="sp__wrapper-mini">
+        <div v-show="!musicPlayer.isSongPageFullScreen && musicPlayer.currentFile" class="sp__wrapper-mini">
             <div class="sp__image" @click="musicPlayer.isSongPageFullScreen = true">
 
                 <div class="sp__image">
@@ -279,63 +281,6 @@ function handlePrev() {
         }
 
 
-
-
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 80vw;
-            height: 8px;
-            margin-top: 5px;
-            margin-bottom: 5px;
-            background: transparent;
-            /* убираем стандартный фон */
-            position: relative;
-        }
-
-        /* Пройденная часть трека */
-        input[type="range"]::-webkit-slider-runnable-track {
-            height: 8px;
-            background: linear-gradient(to right, #333 var(--progress), #414141 var(--progress));
-            border-radius: 2px;
-            transition: background 0.3s;
-        }
-
-        /* Тумблер */
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 24px;
-            height: 24px;
-            background: #333;
-            border-radius: 50%;
-            cursor: pointer;
-            margin-top: -8px;
-            /* чтобы выровнять по центру трека */
-            transition: background 0.3s;
-        }
-
-        /* Firefox */
-        input[type="range"]::-moz-range-track {
-            height: 8px;
-            background: #414141;
-            border-radius: 2px;
-        }
-
-        input[type="range"]::-moz-range-progress {
-            background: #333;
-            height: 8px;
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            background: #333;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-        }
-
-
         .sp__controls {
             height: 200px;
             display: flex;
@@ -471,59 +416,6 @@ function handlePrev() {
         padding-right: 5px;
         width: 100%;
 
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 8px;
-            margin-top: 8px;
-            margin-bottom: 8px;
-            background: transparent;
-            /* убираем стандартный фон */
-            position: relative;
-        }
-
-        /* Пройденная часть трека */
-        input[type="range"]::-webkit-slider-runnable-track {
-            height: 8px;
-            background: linear-gradient(to right, #333 var(--progress), #414141 var(--progress));
-            border-radius: 2px;
-            transition: background 0.3s;
-        }
-
-        /* Тумблер */
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 24px;
-            height: 24px;
-            background: #333;
-            border-radius: 50%;
-            cursor: pointer;
-            margin-top: -8px;
-            /* чтобы выровнять по центру трека */
-            transition: background 0.3s;
-        }
-
-        /* Firefox */
-        input[type="range"]::-moz-range-track {
-            height: 8px;
-            background: #414141;
-            border-radius: 2px;
-        }
-
-        input[type="range"]::-moz-range-progress {
-            background: #333;
-            height: 8px;
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            background: #333;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-        }
     }
 
 
