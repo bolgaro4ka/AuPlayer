@@ -95,7 +95,7 @@ const filteredTracks = computed(() =>
 <style scoped lang="scss">
 .header {
     p {
-        color: #aaa;
+        color: var(--text-secondary-color);
         margin-bottom: 20px;
         font-size: 12px;
     }

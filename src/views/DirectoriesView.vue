@@ -5,7 +5,8 @@
         <ul>
             <li v-for="dir in directories" :key="dir">📁 {{ dir }}</li>
         </ul>
-        <button @click="showExplorer = true">Добавить директорию</button>
+        <button class="main" @click="showExplorer = true">Добавить директорию</button>
+        <button @click="musicPlayer.loadMusicFromDirectories()">Обновить список песен</button>
 
         <Modal v-if="showExplorer" @close="showExplorer = false" title="📁 Выберите директорию">
             <Explorer ref="explorer" @select="onDirectorySelected" @close="showExplorer = false" />
@@ -90,6 +91,20 @@ async function onDirectorySelected(uri: string) {
     }
 
     button {
+        
+        padding-left: 10px;
+        padding-right: 10px;
+        width: 100vw;
+        height: 50px;
+        text-align: center;
+        background-color: var(--on-primary-color);
+        color: var(--primary-color);
+        cursor: pointer;
+        border: none;
+    
+    }
+
+    button.main {
         padding-left: 10px;
         padding-right: 10px;
         width: 100vw;
@@ -101,7 +116,7 @@ async function onDirectorySelected(uri: string) {
         cursor: pointer;
     }
 
-    button:hover {
+    button.main:hover {
         background-color: #555;
     }
 }

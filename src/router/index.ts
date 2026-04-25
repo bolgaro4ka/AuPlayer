@@ -8,16 +8,19 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+      meta: { transition: 'page-opacity' },
     },
     {
       path: '/playlists/',
       name: 'playlists',
       component: () => import('../views/PlaylistsView.vue'),
+      meta: { transition: 'page-opacity' },
     },
     {
       path: '/repositories/',
       name: 'repositories',
       component: () => import('../views/DirectoriesView.vue'),
+      meta: { transition: 'page-opacity' },
     },
     {
       path: '/playlist/:id',

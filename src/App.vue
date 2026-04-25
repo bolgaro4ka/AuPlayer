@@ -21,10 +21,14 @@ onMounted(async () => {
 
     <div class="main">
         <div class="view">
-            <router-view v-slot="{ Component }">
-                <keep-alive include="SongsView">
-                    <component :is="Component" />
-                </keep-alive>
+            <router-view v-slot="{ Component, route }">
+                <transition :name="route.meta.transition as string | null || 'fade'" mode="out-in">
+                    <keep-alive include="SongsView">
+                    
+                        <component :is="Component" />
+                    
+                    </keep-alive>
+                </transition>
             </router-view>
         </div>
         <Sider />
@@ -46,5 +50,15 @@ onMounted(async () => {
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
     }
+}
+
+.page-opacity-enter-active,
+.page-opacity-leave-active {
+    transition: 200ms ease all;
+}
+
+.page-opacity-enter-from,
+.page-opacity-leave-to {
+    opacity: 0;
 }
 </style>
