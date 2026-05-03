@@ -63,7 +63,7 @@ const filteredTracks = computed(() =>
                             <span class="upload-button">
                                 {{ playlistImage ? 'Изменить обложку' : 'Добавить обложку' }}
                             </span>
-                            <img v-if="playlistImage" :src="playlistImage" class="preview-image" />
+                            <img v-if="playlistImage" :src="playlistImage" class="preview-image" />  
                         </label>
                     </div>
 

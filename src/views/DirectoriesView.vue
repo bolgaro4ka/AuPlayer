@@ -6,11 +6,12 @@
             <li v-for="dir in directories" :key="dir">📁 {{ dir }}</li>
         </ul>
         <button class="main" @click="showExplorer = true">Добавить директорию</button>
-        <button @click="musicPlayer.loadMusicFromDirectories()">Обновить список песен</button>
+        <button @click="onUpdateHandler">Обновить список песен</button>
 
         <Modal v-if="showExplorer" @close="showExplorer = false" title="📁 Выберите директорию">
             <Explorer ref="explorer" @select="onDirectorySelected" @close="showExplorer = false" />
         </Modal>
+        <Notification v-if="isNotification" :destroy-time="notificationDestroyTime" :message="notificationText" :description="notificationDescription" @close="isNotification = false" />
     </div>
 </template>
 
@@ -20,10 +21,16 @@ import { Preferences } from '@capacitor/preferences'
 import Modal from '@/components/Modal.vue'
 import Explorer from '@/components/Explorer.vue'
 import { useMusicPlayer } from '@/stores/mainStore'
+import Notification from '@/components/particles/Notification.vue'
 
 const musicPlayer = useMusicPlayer();
 const directories = ref<string[]>([])
 const showExplorer = ref(false)
+
+const isNotification = ref(false);
+const notificationText = ref('');
+const notificationDescription = ref('');
+const notificationDestroyTime = ref(1000);
 
 onMounted(async () => {
     const saved = await Preferences.get({ key: 'directories' })
@@ -48,6 +55,14 @@ async function onDirectorySelected(uri: string) {
         });
     }
     showExplorer.value = false;
+}
+
+async function onUpdateHandler() {
+    await musicPlayer.loadMusicFromDirectories();
+    notificationText.value = 'Список песен обновлен'
+    isNotification.value = true;
+    
+    
 }
 
 

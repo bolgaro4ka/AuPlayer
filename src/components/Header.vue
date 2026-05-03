@@ -25,7 +25,7 @@ const emits = defineEmits(['changeSearch'])
                 </svg>
             </div>
             <div v-else>
-                <RouterLink to="/settings">
+                <RouterLink to="/settings/">
                     <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
                         fill="var(--text-primary-color)">
                         <path

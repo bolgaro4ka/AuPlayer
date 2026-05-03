@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, watch } from 'vue';
 import Sider from './components/Sider.vue';
 import SongPage from './components/SongPage.vue';
 import SplashScreen from './components/SplashScreen.vue';
 import { StatusBar } from '@capacitor/status-bar';
 import { setTheme } from './functions/colors';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 
 onMounted(async () => {
     await StatusBar.setOverlaysWebView({ overlay: false })
     setTheme('dark');
+})
+
+watch(() => router.currentRoute.value.path, () => {
+    console.log(router.currentRoute.value.path);
 })
 
 </script>
@@ -22,13 +29,13 @@ onMounted(async () => {
     <div class="main">
         <div class="view">
             <router-view v-slot="{ Component, route }">
-                <transition :name="route.meta.transition as string | null || 'fade'" mode="out-in">
+                <!-- <transition :name="route.meta.transition as string | null || 'page-opacity'" mode="out-in"> -->
                     <keep-alive include="SongsView">
-                    
+
                         <component :is="Component" />
-                    
+
                     </keep-alive>
-                </transition>
+                <!-- </transition> -->
             </router-view>
         </div>
         <Sider />
@@ -41,8 +48,8 @@ onMounted(async () => {
     flex-direction: column;
     max-height: 100dvh;
     overflow: hidden;
-    
-    
+
+
 
     .view {
         overflow: scroll;
@@ -54,11 +61,13 @@ onMounted(async () => {
 
 .page-opacity-enter-active,
 .page-opacity-leave-active {
+    opacity: 1;
     transition: 200ms ease all;
 }
 
 .page-opacity-enter-from,
 .page-opacity-leave-to {
-    opacity: 0;
+    opacity: 0.5;
+    transition: 200ms ease all;
 }
 </style>

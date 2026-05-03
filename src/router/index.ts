@@ -26,11 +26,13 @@ const router = createRouter({
       path: '/playlist/:id',
       name: 'playlist',
       component: () => import('../views/PlaylistView.vue'),
+      meta: { transition: 'page-opacity' },
     },
     {
-      path: '/settings',
+      path: '/settings/',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
+      meta: { transition: 'page-opacity' },
     },
     
   ],
